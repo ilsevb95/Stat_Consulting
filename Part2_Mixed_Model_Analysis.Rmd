@@ -1,0 +1,277 @@
+---
+title: "Statistical Consulting Mixed Model Analysis"
+author: "Ilse van Beelen & Floor Komen"
+date: "11/4/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE )
+```
+
+
+```{r, include=FALSE}
+# Load ggCaterpillar, used to plot the random intercept
+
+
+rm(list = ls())
+library(ggplot2)
+library(lme4)
+library(tidyverse)
+library(nlme)
+library(emmeans)
+library(car)
+library(lattice)
+
+ggCaterpillar <- function(re, QQ=TRUE, likeDotplot=TRUE) {
+    require(ggplot2)
+    f <- function(x) {
+    pv   <- attr(x, "postVar")
+    cols <- 1:(dim(pv)[1])
+    se   <- unlist(lapply(cols, function(i) sqrt(pv[i, i, ])))
+    ord  <- unlist(lapply(x, order)) + rep((0:(ncol(x) - 1)) * nrow(x), each=nrow(x))
+    pDf  <- data.frame(y=unlist(x)[ord],
+                       ci=1.96*se[ord],
+                       nQQ=rep(qnorm(ppoints(nrow(x))), ncol(x)),
+                       ID=factor(rep(rownames(x), ncol(x))[ord], levels=rownames(x)[ord]),
+                       ind=gl(ncol(x), nrow(x), labels=names(x)))
+
+    if(QQ) {  ## normal QQ-plot
+        p <- ggplot(pDf, aes(nQQ, y))
+        p <- p + facet_wrap(~ ind, scales="free")
+        p <- p + xlab("Standard normal quantiles") + ylab("Random effect quantiles")
+    } else {  ## caterpillar dotplot
+        p <- ggplot(pDf, aes(ID, y)) + coord_flip()
+        if(likeDotplot) {  ## imitate dotplot() -> same scales for random effects
+            p <- p + facet_wrap(~ ind)
+        } else {           ## different scales for random effects
+            p <- p + facet_grid(ind ~ ., scales="free_y")
+        }
+        p <- p + xlab("Levels") + ylab("Random effects")
+    }
+
+    p <- p + theme(legend.position="none")
+    p <- p + geom_hline(yintercept=0)
+    p <- p + geom_errorbar(aes(ymin=y-ci, ymax=y+ci), width=0, colour="black")
+    p <- p + geom_point(aes(size=1.2), colour="blue") 
+    return(p)
+    }
+  lapply(re, f)
+      
+}
+
+theme <-  theme(#panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4),
+              axis.text=element_text(size=15),
+              axis.title=element_text(size=22),
+              plot.title = element_text(size = 22),
+              strip.text = element_text(size = 15),
+              legend.title = element_blank())
+
+```
+
+
+
+```{r, results='hide'}
+
+# Load libraries and read in data
+
+
+df_long <- read.csv("Data/data_final_2019-11-05.csv", sep = ",")
+
+df_long <- df_long %>% 
+  mutate(hads_tot = hads_depr + hads_anx) %>%
+  select(id, ndi, time, hads_tot) %>%
+  mutate(ndi = as.numeric(ndi), time = as.numeric(time),
+         hads_tot = as.numeric(hads_tot), time_fct = as.factor(time))
+  
+str(df_long)
+
+levels(df_long$id) <- c(1:109)
+
+```
+
+
+# Correlation plots
+
+We create a new dataframe where we have a seperate column for NDI after 0, 1 and 2 years
+
+```{r, results='hide'}
+
+df_corr <- df_long %>%
+  select(id, time, ndi) %>%
+  #gather(variable, value, -c(ndi:hads_depr)) %>%
+  #unite(temp, student, variable) %>%
+  #spread(temp, value)
+  spread(key = time, value = ndi, sep = "_ndi")
+
+df_corr2 <- df_long %>%
+  select(id, time, hads_tot) %>%
+  #gather(variable, value, -c(ndi:hads_depr)) %>%
+  #unite(temp, student, variable) %>%
+  #spread(temp, value)
+  spread(key = time, value = hads_tot, sep = "_hads")
+
+
+df_corr <- left_join(df_corr, df_corr2, "id")
+
+```
+
+
+```{r}
+
+ggplot(data = df_corr, aes(x = time_ndi0 , y = time_ndi104)) +  
+  geom_point(size = 4) + geom_smooth(method=lm, se = F, size = 1.5) + 
+  #geom_text(x = 5, y = 80, label = lm_eqn(df_long, x = "hads_anx", y = "ndi"), parse = TRUE) + 
+  xlab("NDI score baseline") + ylab("NDI score 2 years")
+
+cor.test(df_corr$time_ndi0, df_corr$time_ndi52)
+cor.test(df_corr$time_ndi0, df_corr$time_ndi104)
+
+```
+
+# Multiple linear model
+
+```{r}
+
+lm1 <- lm(time_ndi104 ~ time_ndi0 + time_hads0, data = df_corr)
+summary(lm1)
+
+```
+
+
+
+# Linear Mixed Model Analysis
+
+```{r}
+
+model1 <- nlme::lme(ndi ~ time, random = ~1|id, method= "ML", data = df_long)
+model2 <- nlme::lme(ndi ~ time + hads_tot, random = ~1|id, method= "ML", data = df_long)
+model3 <- nlme::lme(ndi ~ time + hads_tot + time:hads_tot, random = ~1|id, method= "ML", data = df_long)
+model4 <- nlme::lme(ndi ~ time + hads_tot + hads_tot:time, random = ~1|id, method= "ML", data = df_long)
+
+anova(model1, model2)
+anova(model2, model3)
+
+
+
+```
+
+## Check assumptions model1
+
+```{r}
+
+
+# Homogeneity of variance
+plot(resid(model1))
+# Normally distributed residuals
+qqPlot(resid(model1))
+
+# Influencial points
+infl2 = influence(model1, obs = T)
+cooksd = cooks.distance(infl2) # two outliers, 
+
+
+plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")  # plot cook's distance
+abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
+text(x = 1:length(cooksd) , y=cooksd, labels=ifelse(cooksd> 4*mean(cooksd, na.rm=T), 
+                                                    1:length(cooksd),""), col="blue", pos =2)
+
+df_long[c(251, 162, 29, 170), ]
+
+```
+
+
+## Check assumptions model2
+
+```{r}
+
+
+# Homogeneity of variance
+plot(resid(model2))
+df_long[c(34, 289), ]
+
+# Normally distributed residuals
+qqPlot(resid(model2))
+
+# Influencial points
+infl2 = influence(model2, obs = T)
+cooksd = cooks.distance(infl2) # two outliers, 
+
+
+plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")  # plot cook's distance
+abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
+text(x = 1:length(cooksd) , y=cooksd, labels=ifelse(cooksd> 4*mean(cooksd, na.rm = T),
+                                                    1:length(cooksd),""), col="blue", pos =2)
+
+df_long[c(251, 34, 162, 29), ]
+
+
+```
+
+
+## Best fitting is model2
+
+Now, we fit the data with REML instead of ML.
+
+```{r}
+
+#model_final <- nlme::lme(ndi ~ time + hads_tot, random = ~1|id, method= "REML", data = df_long)
+model_final <- lme4::lmer(ndi ~ time_fct + hads_tot + (1|id), REML= T, data = df_long)
+summary(model_final)
+
+
+random_effects <- VarCorr(model_final)
+print(random_effects,comp=c("Variance"))
+
+
+# Calculate the intra class correlation:
+# Model explains only 46.9 % of variance
+ 83.300 / ( 83.300 +  94.349)
+
+```
+
+
+## Plot random effects
+
+```{r}
+
+
+rr1 <- ranef(model_final,  condVar = T)
+ggCaterpillar(rr1, QQ = F, likeDotplot = T)
+
+```
+
+## Calculate estimated marginal means (EMM)
+
+```{r}
+
+model_final_emm <- lme4::lmer(ndi ~ time_fct + hads_tot + (1|id), REML= T, data = df_long)
+
+refgrid <-  ref_grid(model_final_emm)
+refgrid
+df_emmeans <-  data.frame(summary(refgrid))
+df_emmeans$time <- as.numeric(as.character(df_emmeans$time_fct))
+df_emmeans$lwr <- df_emmeans$prediction - 1.96*df_emmeans$SE
+df_emmeans$upr <- df_emmeans$prediction + 1.96*df_emmeans$SE
+
+# Compute Estimated Marginal Means over all timepoints for the different Treatments and gender
+predictions <-  emmeans(refgrid, specs = c('time_fct'))
+
+
+```
+
+Plot predictions with CI
+
+```{r}
+
+ggplot(data = df_emmeans, aes(x = time, y = prediction )) + geom_point() + 
+  geom_line(col = "blue", size = 2) + 
+  geom_point(data = df_long, aes(x = time, y = ndi, col = id, size = 0.1)) +
+  geom_ribbon(data=df_emmeans, aes(ymin= lwr, ymax= upr), alpha=0.3) + #, 
+              #col = "grey", fill = "grey") + 
+  theme(legend.position = "none") + theme 
+
+
+
+```
+

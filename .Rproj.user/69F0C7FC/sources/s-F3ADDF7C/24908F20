@@ -1,0 +1,26 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1572865613517.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "24908F20",
+    "lastKnownWriteTime" : 1573079144,
+    "last_content_update" : 1573079144441,
+    "path" : "C:/Users/Ilse/OneDrive/StatisticalScience/Consulting/Client/Inital_data_analysis/Part2_Mixed_Model_Analysis.Rmd",
+    "project_path" : "Part2_Mixed_Model_Analysis.Rmd",
+    "properties" : {
+        "cursorPosition" : "275,0",
+        "scrollLine" : "252",
+        "tempName" : "Untitled1"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}
