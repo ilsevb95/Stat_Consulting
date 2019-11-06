@@ -84,9 +84,8 @@ df_long <- df_long %>%
   mutate(ndi = as.numeric(ndi), time = as.numeric(time),
          hads_tot = as.numeric(hads_tot), time_fct = as.factor(time))
   
-str(df_long)
 
-levels(df_long$id) <- c(1:109)
+
 
 ```
 
@@ -142,6 +141,8 @@ summary(lm1)
 
 # Linear Mixed Model Analysis
 
+We tested 3 different models. Model2 (no interaction) fits the data best. The AIC decreases significantly. Note that time is a continious variable here (not a factor).
+
 ```{r}
 
 model1 <- nlme::lme(ndi ~ time, random = ~1|id, method= "ML", data = df_long)
@@ -156,29 +157,6 @@ anova(model2, model3)
 
 ```
 
-## Check assumptions model1
-
-```{r}
-
-
-# Homogeneity of variance
-plot(resid(model1))
-# Normally distributed residuals
-qqPlot(resid(model1))
-
-# Influencial points
-infl2 = influence(model1, obs = T)
-cooksd = cooks.distance(infl2) # two outliers, 
-
-
-plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")  # plot cook's distance
-abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
-text(x = 1:length(cooksd) , y=cooksd, labels=ifelse(cooksd> 4*mean(cooksd, na.rm=T), 
-                                                    1:length(cooksd),""), col="blue", pos =2)
-
-df_long[c(251, 162, 29, 170), ]
-
-```
 
 
 ## Check assumptions model2
@@ -211,7 +189,7 @@ df_long[c(251, 34, 162, 29), ]
 
 ## Best fitting is model2
 
-Now, we fit the data with REML instead of ML.
+Now, we fit the data with REML instead of ML. Also note that we now added time as a factor. This seems to explain more variance.
 
 ```{r}
 
@@ -243,19 +221,19 @@ ggCaterpillar(rr1, QQ = F, likeDotplot = T)
 
 ## Calculate estimated marginal means (EMM)
 
+We calculate the EMM for NDI, taking into account the repeated measurements over time and the HADS score.
+
 ```{r}
 
 model_final_emm <- lme4::lmer(ndi ~ time_fct + hads_tot + (1|id), REML= T, data = df_long)
 
 refgrid <-  ref_grid(model_final_emm)
 refgrid
+
 df_emmeans <-  data.frame(summary(refgrid))
 df_emmeans$time <- as.numeric(as.character(df_emmeans$time_fct))
 df_emmeans$lwr <- df_emmeans$prediction - 1.96*df_emmeans$SE
 df_emmeans$upr <- df_emmeans$prediction + 1.96*df_emmeans$SE
-
-# Compute Estimated Marginal Means over all timepoints for the different Treatments and gender
-predictions <-  emmeans(refgrid, specs = c('time_fct'))
 
 
 ```
@@ -267,9 +245,10 @@ Plot predictions with CI
 ggplot(data = df_emmeans, aes(x = time, y = prediction )) + geom_point() + 
   geom_line(col = "blue", size = 2) + 
   geom_point(data = df_long, aes(x = time, y = ndi, col = id, size = 0.1)) +
-  geom_ribbon(data=df_emmeans, aes(ymin= lwr, ymax= upr), alpha=0.3) + #, 
-              #col = "grey", fill = "grey") + 
-  theme(legend.position = "none") + theme 
+  geom_ribbon(data=df_emmeans, aes(ymin= lwr, ymax= upr), alpha=0.3) + 
+  theme(legend.position = "none") + theme + 
+  ggtitle("Estimated marginal mean of NDI over time") +
+  xlab("Predicted NDI")
 
 
 
