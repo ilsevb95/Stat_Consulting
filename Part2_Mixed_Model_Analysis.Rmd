@@ -163,7 +163,7 @@ anova(model2, model3)
 
 ```{r}
 
-
+getVarCov(model2, individuals = 2, type = "conditional")
 # Homogeneity of variance
 plot(resid(model2))
 df_long[c(34, 289), ]
