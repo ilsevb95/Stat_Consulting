@@ -3,15 +3,15 @@ library(data.table)
 
 # Define UI for miles per gallon application
 ui <- fluidPage(
-  headerPanel("HADS and NDI Mixed Model"), 
+  headerPanel("Longitudional model for NDI"), 
   sidebarPanel(
     p("Select the HADS Depression score at baseline"),
-    numericInput(inputId = "hads_depr", label = "HADS Depression score", 1, min=0, max=20, step=1),
+    numericInput(inputId = "hads_depr", label = "HADS Depression score at baseline", 1, min=0, max=20, step=1),
     p("Select the HADS Anxiety score at baseline"),
-    numericInput(inputId = "hads_anx", label = "HADS Anxiety score", 1,  min=0, max=20, step=1),
+    numericInput(inputId = "hads_anx", label = "HADS Anxiety score at baseline", 1,  min=0, max=20, step=1),
     #p("Select the total HADS score"),
     #numericInput(inputId = "hads_tot", label = "HADS total score", 1,  min=0, max=40, step=1),
-    p("Select the NDI at baseline"),
+    p("Select the NDI score at baseline"),
     numericInput(inputId = "NDI_0", label = "NDI at baseline", 1,  min=0, max=100, step=1)),
 
 

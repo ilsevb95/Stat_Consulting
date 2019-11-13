@@ -1,0 +1,26 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1573646831467.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "4932FFF8",
+    "lastKnownWriteTime" : 1573568792,
+    "last_content_update" : 1573568792,
+    "path" : "C:/Users/Ilse/OneDrive/StatisticalScience/Consulting/Client/Inital_data_analysis/Part3_Prediction_Model.Rmd",
+    "project_path" : "Part3_Prediction_Model.Rmd",
+    "properties" : {
+        "cursorPosition" : "117,9",
+        "scrollLine" : "110",
+        "tempName" : "Untitled1"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

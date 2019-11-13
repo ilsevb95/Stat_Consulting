@@ -55,9 +55,11 @@ shinyServer(function(input, output) {
   #output$time=input$time
   hads_tot <- reactive({input$hads_anx+input$hads_depr})
   pred1 <- reactive({predict(model_final,newdata=
-                               data.frame(ndi0= input$NDI_0 , hads0=hads_tot(),time = 52,id=100), allow.new.levels=TRUE, interval="predict")})
+                               data.frame(ndi0= input$NDI_0 , hads0=hads_tot(),time = 52,id=100), 
+                             allow.new.levels=TRUE, interval="predict")})
   pred2 <- reactive({predict(model_final,newdata=
-                               data.frame(ndi0= input$NDI_0 , hads0=hads_tot(),time = 104,id=100), allow.new.levels=TRUE)})
+                               data.frame(ndi0= input$NDI_0 , hads0=hads_tot(),time = 104,id=100), 
+                             allow.new.levels=TRUE)})
   
   case_anxiety <- reactive( if (input$hads_anx<8){
     "Non case"}else if(input$hads_anx>10){"Case"}
@@ -83,7 +85,7 @@ shinyServer(function(input, output) {
     ggplot() + geom_point() + 
       geom_line(data=df_emmeans, aes(x=time, y=prediction), col = "blue", size = 2) +
       geom_line(aes(x=c(0,52,104),y=c(input$NDI_0,as.numeric(pred1()),as.numeric(pred2()))), col= "red", size=2)+
-      #geom_point(data = data, aes(x = time, y = ndi, col = id, size = 0.1)) +
+      geom_point(data = df_emmeans, aes(x = time, y = prediction), col = "blue", size = 3) +
       geom_ribbon(data=df_emmeans, aes(x=time,ymin= lwr, ymax= upr), alpha=0.3) + 
       theme(legend.position = "none") + theme + 
       #ggtitle("Estimated marginal mean of NDI over time") +
