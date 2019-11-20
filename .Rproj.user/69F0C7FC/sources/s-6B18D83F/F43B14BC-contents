@@ -80,7 +80,7 @@ df_long <- read.csv("Data/data_final_2019-11-05.csv", sep = ",")
 
 df_long <- df_long %>% 
   mutate(hads_tot = hads_depr + hads_anx) %>%
-  select(id, ndi, time, hads_tot) %>%
+  select(id, ndi, time, hads_tot, hads_anx, hads_depr ) %>%
   mutate(ndi = as.numeric(ndi), time = as.numeric(time),
          hads_tot = as.numeric(hads_tot), time_fct = as.factor(time))
   
@@ -141,38 +141,53 @@ summary(lm1)
 
 # Linear Mixed Model Analysis
 
-We tested 3 different models. Model2 (no interaction) fits the data best. The AIC decreases significantly. Note that time is a continious variable here (not a factor).
+We tested several models. Statistically speaking model4 is best, but we choose the parameters based on clinical importance. Therefore, model 4 is choosen.
 
 ```{r}
 
-model1 <- nlme::lme(ndi ~ time, random = ~1|id, method= "ML", data = df_long)
-model2 <- nlme::lme(ndi ~ time + hads_tot, random = ~1|id, method= "ML", data = df_long)
-model3 <- nlme::lme(ndi ~ time + hads_tot + time:hads_tot, random = ~1|id, method= "ML", data = df_long)
-model4 <- nlme::lme(ndi ~ time + hads_tot + hads_tot:time, random = ~1|id, method= "ML", data = df_long)
+model1 <- nlme::lme(ndi ~ time_fct, random = ~1|id, method= "ML", data = df_long)
+model2 <- nlme::lme(ndi ~ time_fct + hads_tot, random = ~1|id, method= "ML", data = df_long)
+model3 <- nlme::lme(ndi ~ time_fct + hads_tot + time:hads_tot, random = ~1|id, method= "ML", 
+                    data = df_long)
+model4 <- nlme::lme(ndi ~ time_fct  + hads_depr, random = ~1|id, method= "ML", 
+                    data = df_long)
+model5 <- nlme::lme(ndi ~ time_fct + hads_anx + hads_depr, random = ~1|id, method= "ML", 
+                    data = df_long)
 
 anova(model1, model2)
 anova(model2, model3)
+anova(model4, model5)
+summary(model5)
 
+cor.test(df_long$hads_anx, df_long$hads_depr)
 
 
 ```
 
+## Check multicollinearity
+
+There is a strong correlation between HADS anxiety and HADS depression. We now check for multicollinearity. No VIF above 5 (thus nu R-squared above 0.9)
+
+```{r}
+vif(model5)
+
+```
 
 
-## Check assumptions model2
+## Check assumptions model5
 
 ```{r}
 
-getVarCov(model2, individuals = 2, type = "conditional")
+getVarCov(model5, individuals = 2, type = "conditional")
 # Homogeneity of variance
-plot(resid(model2))
+plot(resid(model5))
 df_long[c(34, 289), ]
 
 # Normally distributed residuals
-qqPlot(resid(model2))
+qqPlot(resid(model5))
 
 # Influencial points
-infl2 = influence(model2, obs = T)
+infl2 = influence(model5, obs = T)
 cooksd = cooks.distance(infl2) # two outliers, 
 
 
@@ -181,7 +196,7 @@ abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
 text(x = 1:length(cooksd) , y=cooksd, labels=ifelse(cooksd> 4*mean(cooksd, na.rm = T),
                                                     1:length(cooksd),""), col="blue", pos =2)
 
-df_long[c(251, 34, 162, 29), ]
+df_long[c(289, 27, 287, 143), ]
 
 
 ```
@@ -194,7 +209,8 @@ Now, we fit the data with REML instead of ML. Also note that we now added time a
 ```{r}
 
 #model_final <- nlme::lme(ndi ~ time + hads_tot, random = ~1|id, method= "REML", data = df_long)
-model_final <- lme4::lmer(ndi ~ time_fct + hads_tot + (1|id), REML= T, data = df_long)
+model_final <- nlme::lme(ndi ~ time_fct + hads_anx + hads_depr, method = "ML",
+                         random = ~1|id, data = df_long)
 summary(model_final)
 
 
@@ -203,8 +219,8 @@ print(random_effects,comp=c("Variance"))
 
 
 # Calculate the intra class correlation:
-# Model explains only 46.9 % of variance
- 83.300 / ( 83.300 +  94.349)
+# Model explains only 47.3 % of variance
+ 79.54 / ( 79.54 +  88.68)
 
 ```
 
@@ -225,9 +241,7 @@ We calculate the EMM for NDI, taking into account the repeated measurements over
 
 ```{r}
 
-model_final_emm <- lme4::lmer(ndi ~ time_fct + hads_tot + (1|id), REML= T, data = df_long)
-
-refgrid <-  ref_grid(model_final_emm)
+refgrid <-  ref_grid(model_final)
 refgrid
 
 df_emmeans <-  data.frame(summary(refgrid))
@@ -250,6 +264,40 @@ ggplot(data = df_emmeans, aes(x = time, y = prediction )) + geom_point() +
   ggtitle("Estimated marginal mean of NDI over time") +
   xlab("Predicted NDI")
 
+
+
+```
+
+## Cross validation
+
+```{r}
+
+# Create folds
+K <- 5
+index <- rep(1:K, floor(nrow(df_long)/K)+1)[1:nrow(df_long)]
+fold.index <- sample(index)
+
+
+# Create Loss function: Root Mean Squard Error
+Loss <- function(x, y){
+  mse <- sum((x-y)^2)/length(x)
+  rmse <- sqrt(mse)
+  return(rmse)
+}
+
+loss <- numeric(K)
+
+for (k in 1:K){
+  training <- df_long[fold.index!=k, ]
+  validation <- df_long[fold.index==k, ]
+  training.fit <- model_final
+  
+  validation.predict <- predict(training.fit, newdata=validation, type='response')
+  loss[k] <- Loss(validation$ndi, validation.predict)
+}
+
+loss
+mean(loss)
 
 
 ```

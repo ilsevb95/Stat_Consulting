@@ -26,6 +26,14 @@ theme <-  theme(#panel.background = element_rect(fill = "lightgrey", colour = "w
               plot.title = element_text(size = 22),
               strip.text = element_text(size = 15))
 
+
+# have a look at the missing values
+
+data_missing <- data %>%
+  select(PATIENTID, PMOMENTX, NDI.Som.GOED, HADSDEPR, HADSANGS) %>%
+  filter_all(any_vars(is.na(.))) %>%
+  print(n = Inf)
+
 ```
 
 
@@ -84,33 +92,11 @@ df_week104$week104_anx <- ifelse(df_week104$hads_anx <= 7, 1,
 
 df_week104 <- df_week104 %>%
   dplyr::select(id, time, hads_depr, hads_anx, week104_depr, week104_anx) %>%
-  mutate(week104_depr_labels = recode(week104_depr, "non", "doubtful", "cases")) %>%
-  mutate(week104_anx_labels = recode(week104_anx, "non", "doubtful", "cases"))
+  mutate(week104_depr_labels = dplyr::recode(week104_depr, "non", "doubtful", "cases")) %>%
+  mutate(week104_anx_labels = dplyr::recode(week104_anx, "non", "doubtful", "cases"))
   
 
 df_long <- left_join(df_all, df_week104, by = c("id",  "time", "hads_anx", "hads_depr"))
-
-
-df_profiles <- df_long %>%
-  dplyr::select(id, time, baseline_depr, baseline_anx, baseline_depr_labels, baseline_anx_labels,
-         week104_depr, week104_anx, week104_depr_labels, week104_anx_labels) %>%
-  filter(time == 104) %>%
-  drop_na() %>%
-  mutate(profile_depr = paste(baseline_depr, week104_depr, sep = " -")) %>%
-  mutate(profile_anx = paste(baseline_anx, week104_anx, sep = " - ")) %>%
-  mutate(profile_depr_labels = paste(baseline_depr_labels, week104_depr_labels, sep = " - ")) %>%
-  mutate(profile_anx_labels = paste(baseline_anx_labels, week104_anx_labels, sep = " - ")) %>%
-  dplyr::select(id, profile_depr, profile_anx, profile_anx_labels, profile_depr_labels) 
-
-
-# Copy this dataframe 3 times.
-df_profiles2x <- rbind(df_profiles, df_profiles)
-df_profiles <- rbind(df_profiles2x, df_profiles)  
-
-
-df_long <- df_long %>%
-  left_join(df_profiles, by = "id") %>%
-  distinct() 
 
 
 # remove nas
@@ -145,10 +131,16 @@ na_count <- data.frame(na_count)
 na_count
 
 
-df_long %>% 
+df_long_missing <- df_long %>% 
   dplyr::select(id, time, ndi, hads_anx, hads_depr) %>%
   filter_all(any_vars(is.na(.))) %>%
   print(n = Inf)
+
+data_missing$PATIENTID <- as.factor(data_missing$PATIENTID)
+
+all.equal(df_long_missing$id, data_missing$PATIENTID)
+setdiff(df_long_missing$id, data_missing$PATIENTID)
+
 
 ```
 

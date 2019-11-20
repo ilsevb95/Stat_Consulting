@@ -24,7 +24,7 @@ library(emmeans)
 library(car)
 library(lattice)
 
-theme <-  theme(#panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4),
+theme <-  theme(
               axis.text=element_text(size=15),
               axis.title=element_text(size=22),
               plot.title = element_text(size = 22),
@@ -37,15 +37,15 @@ df_long <- read.csv("Data/data_final_2019-11-05.csv", sep = ",")
 # Some data wrangling
 df_long <- df_long %>% 
   mutate(hads_tot = hads_depr + hads_anx) %>%
-  select(id, ndi, time, hads_tot) %>%
+  select(id, ndi, time, hads_tot, hads_anx, hads_depr) %>%
   mutate(ndi = as.numeric(ndi), time = as.numeric(time),
          hads_tot = as.numeric(hads_tot), time_fct = as.factor(time))
   
 
 # Create new dataframe with HADS at time = 0 & NDI at time = 0
 df_time0 <- df_long[df_long$time == 0, ]
-df_time0 <- select(df_time0, id, ndi, hads_tot)
-colnames(df_time0) <-  c("id", "ndi0", "hads0")
+df_time0 <- select(df_time0, id, ndi, hads_tot, hads_anx, hads_depr)
+colnames(df_time0) <-  c("id", "ndi0", "hads0_tot", "hads0_anx", "hads0_depr")
 
 # Create new dataframe with HADS and NDI at 52 and 104 weeks
 df_time1_2 <- df_long[df_long$time != 0, ]
@@ -67,12 +67,10 @@ i = 1,2,3, \ldots, 109$$
 
 ```{r}
 
-model_pred1 <- lmer(ndi1_2 ~ ndi0 + hads0 + time_fct + (1|id), data = df_prediction, REML = F)
-model_pred2 <- lmer(ndi1_2 ~ ndi0 + hads0 + (1|id), data = df_prediction, REML = F)
-summary(model_pred2)
-summary(model_pred1)
+model_pred1 <- lmer(ndi1_2 ~ ndi0 + hads0_anx + hads0_depr + time_fct + (1|id), 
+                    data = df_prediction, REML = F)
 
-anova(model_pred2, model_pred1)
+summary(model_pred1)
 
 ```
 
@@ -84,7 +82,9 @@ Final model is fitted with REML
 
 ```{r}
 
-model_final <- lmer(ndi1_2 ~ ndi0 + hads0 + time_fct + (1|id), data = df_prediction, REML = T) 
+model_final <- lmer(ndi1_2 ~ ndi0 + hads0_anx + hads0_depr + time_fct + (1|id), 
+                    data = df_prediction, REML = T)
+
 summary(model_final)
 
 
@@ -112,16 +112,14 @@ loss <- numeric(K)
 for (k in 1:K){
   training <- df_prediction[fold.index!=k, ]
   validation <- df_prediction[fold.index==k, ]
-  training.fit <- lmer(ndi1_2 ~ ndi0 + hads0 + time_fct + (1|id), 
-                       data = df_prediction, REML = T)
+  training.fit <- model_final
   
   validation.predict <- predict(training.fit, newdata=validation, type='response')
-  #validation.predict <- round(validation.predict, digits = 0)
   loss[k] <- Loss(validation$ndi1_2, validation.predict)
 }
 
 loss
-mean(loss)
+round(mean(loss), digits = 1)
 
 ```
 
