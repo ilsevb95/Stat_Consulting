@@ -22,6 +22,9 @@ library(nlme)
 library(emmeans)
 library(car)
 library(lattice)
+library(xtable)
+library(gridExtra)
+
 
 ggCaterpillar <- function(re, QQ=TRUE, likeDotplot=TRUE) {
     require(ggplot2)
@@ -60,12 +63,24 @@ ggCaterpillar <- function(re, QQ=TRUE, likeDotplot=TRUE) {
       
 }
 
-theme <-  theme(#panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4),
-              axis.text=element_text(size=15),
+# Set layout for all figures
+theme <- theme(panel.background = element_blank(),
+          panel.grid.major = element_line(colour = "darkgrey", size=0.5),
+          panel.grid.minor = element_line(colour = "grey", 
+                                          size=.25, 
+                                          linetype = "dashed"),
+          panel.border = element_blank(),
+          axis.line.x = element_line(colour = "black", 
+                                     size=0.5, 
+                                     lineend = "butt"),
+          axis.line.y = element_line(colour = "black", 
+                                     size=0.5),
+          axis.text=element_text(size=15),
               axis.title=element_text(size=22),
               plot.title = element_text(size = 22),
               strip.text = element_text(size = 15),
               legend.title = element_blank())
+
 
 ```
 
@@ -118,13 +133,25 @@ df_corr <- left_join(df_corr, df_corr2, "id")
 
 ```{r}
 
-ggplot(data = df_corr, aes(x = time_ndi0 , y = time_ndi104)) +  
+p1 <- ggplot(data = df_corr, aes(x = time_ndi0 , y = time_ndi52)) +  
   geom_point(size = 4) + geom_smooth(method=lm, se = F, size = 1.5) + 
   #geom_text(x = 5, y = 80, label = lm_eqn(df_long, x = "hads_anx", y = "ndi"), parse = TRUE) + 
-  xlab("NDI score baseline") + ylab("NDI score 2 years")
+  xlab("NDI score baseline") + ylab("NDI score after 1 years") + theme
+
+p2 <- ggplot(data = df_corr, aes(x = time_ndi0 , y = time_ndi104)) +  
+  geom_point(size = 4) + geom_smooth(method=lm, se = F, size = 1.5) + 
+  #geom_text(x = 5, y = 80, label = lm_eqn(df_long, x = "hads_anx", y = "ndi"), parse = TRUE) + 
+  xlab("NDI score baseline") + ylab("NDI score after 2 years") + theme
 
 cor.test(df_corr$time_ndi0, df_corr$time_ndi52)
 cor.test(df_corr$time_ndi0, df_corr$time_ndi104)
+
+p1p2 <- grid.arrange(p1, p2, nrow=1)
+
+png("Figures/Corr_NDI.png",width = 15, height = 7, units='in',res=300)
+plot(p1p2)
+dev.off()
+
 
 ```
 
@@ -141,7 +168,7 @@ summary(lm1)
 
 # Linear Mixed Model Analysis
 
-We tested several models. Statistically speaking model4 is best, but we choose the parameters based on clinical importance. Therefore, model 4 is choosen.
+We tested several models. Statistically speaking model4 is best, but we choose the parameters based on clinical importance. Therefore, model 5 is choosen.
 
 ```{r}
 
@@ -159,7 +186,6 @@ anova(model2, model3)
 anova(model4, model5)
 summary(model5)
 
-cor.test(df_long$hads_anx, df_long$hads_depr)
 
 
 ```
@@ -176,10 +202,16 @@ vif(model5)
 
 ## Check assumptions model5
 
+We assume the folowing:
+
+- error term is normally distributed
+- error term is homogeneously distributed
+- no outliers
+
 ```{r}
 
-getVarCov(model5, individuals = 2, type = "conditional")
 # Homogeneity of variance
+par(mfrow = (c(1,3)))
 plot(resid(model5))
 df_long[c(34, 289), ]
 
@@ -199,12 +231,13 @@ text(x = 1:length(cooksd) , y=cooksd, labels=ifelse(cooksd> 4*mean(cooksd, na.rm
 df_long[c(289, 27, 287, 143), ]
 
 
+
 ```
 
 
-## Best fitting is model2
+## Best fitting is model5
 
-Now, we fit the data with REML instead of ML. Also note that we now added time as a factor. This seems to explain more variance.
+Now, we fit the data with REML instead of ML. All estimates of the predictors are significant, except HADS anxiety. We also calculate the Intra-class correlation (perc of var explained)
 
 ```{r}
 
@@ -212,15 +245,15 @@ Now, we fit the data with REML instead of ML. Also note that we now added time a
 model_final <- nlme::lme(ndi ~ time_fct + hads_anx + hads_depr, method = "ML",
                          random = ~1|id, data = df_long)
 summary(model_final)
-
-
-random_effects <- VarCorr(model_final)
-print(random_effects,comp=c("Variance"))
+final_mod_summ <- coef(summary(model_final))
+xtable(final_mod_summ)
 
 
 # Calculate the intra class correlation:
 # Model explains only 47.3 % of variance
- 79.54 / ( 79.54 +  88.68)
+random_effects <- VarCorr(model_final)
+print(random_effects,comp=c("Variance"))
+79.54823 / (79.54823 + 88.6839)
 
 ```
 
@@ -252,19 +285,23 @@ df_emmeans$upr <- df_emmeans$prediction + 1.96*df_emmeans$SE
 
 ```
 
-Plot predictions with CI
+
+Plot average NDI with CI over time
 
 ```{r}
 
-ggplot(data = df_emmeans, aes(x = time, y = prediction )) + geom_point() + 
+p3 <- ggplot(data = df_emmeans, aes(x = time, y = prediction )) + geom_point() + 
   geom_line(col = "blue", size = 2) + 
-  geom_point(data = df_long, aes(x = time, y = ndi, col = id, size = 0.1)) +
+  geom_point(col = "blue", size = 4) +
   geom_ribbon(data=df_emmeans, aes(ymin= lwr, ymax= upr), alpha=0.3) + 
-  theme(legend.position = "none") + theme + 
-  ggtitle("Estimated marginal mean of NDI over time") +
-  xlab("Predicted NDI")
+  theme(legend.position = "none") +
+  ylab("NDI")  +
+  xlab("Time (weeks)") + theme
 
 
+png("Figures/Marginal_NDI.png",width = 15, height = 7, units='in',res=300)
+plot(p3)
+dev.off()
 
 ```
 

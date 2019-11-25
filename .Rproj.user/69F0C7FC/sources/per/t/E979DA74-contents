@@ -1,0 +1,1000 @@
+####################################################################################################
+# Run-Time Environment:     R version 3.4.2
+# Author:                   Ilse van Beelen, intern CHDR
+# Supervisor:               Jeroen van Smeden
+# Sponsor:                  none
+# Project number:           CHDR1518  
+# Short title:  		        Effect of different polymorfisms of CYP2D6 in healthy volunteers (HV) 
+#                           in relation to PK/PD of metoprolol
+# Purpose of script:        Cleaned up data is used for the first exploratory PD plots with package
+#                           GGPPLOT2
+# Datafiles used:			      CHDR1518_DataPD_2018-04-26.csv
+#                           CHDR1518_DataCovariates_2018-04-26.csv
+#                          
+# Date:                     2018-04-30
+# Version:  		    	      V.1.0					
+####################################################################################################
+#------------------
+#    LIBRARIES
+#------------------
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(compare)
+library(reshape2)
+#------------------
+#    INPUT
+#------------------
+rm(list = ls(all.names = TRUE))
+options(warn = 1) 
+
+
+DataPD = read.table(file =  "../Data/CleanData/CHDR1518_DataPD_2018-06-08.csv", sep = ',', 
+                    header = T)
+
+#-------------------------
+#    INPUT 
+#-------------------------
+# Merge dataframes and remove capital letters in column headers
+names(DataPD) = tolower(names(DataPD))
+
+# Change levels of treatment to 1 (=placebo) and 2 (=treatment)
+levels(DataPD$treatment) = c(1,2)
+
+# Each variable needs to be recognized by R as numeric value or factor
+DataPD$hr = as.numeric(DataPD$hr)
+DataPD$gender = as.factor(DataPD$gender)
+DataPD$systolic_bp = as.numeric(DataPD$systolic_bp)
+DataPD$diastolic_bp = as.numeric(DataPD$diastolic_bp)
+#DataPD$cyp_meta = as.numeric(as.character(DataPD$cyp_meta))
+DataPD$cyp_meta = as.factor(DataPD$cyp_meta)
+DataPD$treatment = as.numeric(DataPD$treatment)
+
+# Add Occasion (1 or 2) -> which day it is of the study
+# CHDR1518 is a cross over study, each subject was administered with both the treatment and placebo
+DataPD$occ = ifelse(DataPD$day == 1, 1, NA)
+DataPD$occ = ifelse(DataPD$treatment == 'placebo' & DataPD$day == 1, 2, DataPD$occ)
+
+DataPD$occ = ifelse(DataPD$day == 2, 2, DataPD$occ)
+DataPD$occ = ifelse(DataPD$treatment == 'placebo' & DataPD$day == 2, 1, DataPD$occ)
+
+
+
+
+#------------------
+#    SET COLOURS
+#------------------
+# Set colors for the different genders
+GenderColors = as.character(c("female"="#FF3399", "male"="#0000CC")) 
+GenderScale = scale_colour_manual(name="Min-Max-Range and mean \nof males and females", 
+                                  values= GenderColors)
+
+GenderFill = scale_fill_manual(name="Min-Max-Range and mean \nof males and females",
+                               values= c("female"="#FF3399", "male"="#0000CC")) 
+
+
+
+#-------------------------
+#    SUMMARISE HR 
+#-------------------------
+# Three dataframes are created to calculate Means, SD and CI
+
+
+# Calculate Meand and CI
+# Create SummaryHR2, has one argument less than SummaryHR
+# create new data frame consisting of the mean and lower and upper 
+# quantiles for a group specified in the 2nd argument (paste(tadh, gender, treatment)
+simset = DataPD
+
+for(i in c(1:ncol(simset))) {
+  simset[,i] <- as.numeric(simset[,i])
+}
+
+
+SummaryHR2<-data.frame(
+  tadh=as.double(tapply(simset$tadh,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  gender=as.double(tapply(simset$gender,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  treatment=as.double(tapply(simset$treatment,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  mean=as.double(tapply(simset$hr,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  Lower=as.double(tapply(simset$hr,paste(simset$gender,simset$tadh, simset$treatment),quantile,0.025)),
+  Upper=as.double(tapply(simset$hr,paste(simset$gender,simset$tadh, simset$treatment),quantile,0.975))
+)
+
+
+
+
+# The variables in SummaryHR and DataPD need to be recognized by R in the same way
+# Otherwise plotting won't be possible
+SummaryHR2$gender = ifelse(SummaryHR2$gender == 0, 'male', 'female')
+SummaryHR2$treatment = ifelse(SummaryHR2$ treatment == 1, 'placebo', 'metoprolol')
+
+
+
+# Change variables in DataPD (easier for plotting)
+DataPD$gender = ifelse(DataPD$gender == 0, 'male', "female")
+DataPD$treatment = ifelse(DataPD$ treatment == 1, 'placebo', 'metoprolol')
+DataPD$subjectnr = as.factor(DataPD$subjectnr)
+DataPD$treatment = as.factor(DataPD$treatment)
+
+
+# Summarise HR per timepoint, per treatment, gender and metabolizer
+SummaryHR = select(DataPD, subjectnr, tadh, hr, treatment,  gender, cyp_meta)
+SummaryHR = melt(data = SummaryHR, id.vars=c("subjectnr", "tadh", "cyp_meta", "gender", "treatment"))
+SummaryHR = data.frame(ddply(SummaryHR, c("tadh", "treatment", "gender","cyp_meta",  "variable"), 
+                             summarise,
+                               Mean = round(mean(value), digits = 2),
+                               SD = round(sd(value), digits = 2),
+                               N = length(value)))
+
+
+# Summarise HR per timepoint, per treatment, gender and metabolizer
+SummaryHR3 = select(DataPD, subjectnr, tadh, hr, treatment,  gender)
+SummaryHR3 = melt(data = SummaryHR3, id.vars=c("subjectnr", "tadh", "gender", "treatment"))
+SummaryHR3 = data.frame(ddply(SummaryHR3, c("tadh", "treatment", "gender",  "variable"), 
+                             summarise,
+                             Mean = round(mean(value), digits = 2),
+                             SD = round(sd(value), digits = 2),
+                             N = length(value)))
+
+
+
+
+# The errorbars overlap, so use position_dodge to move them horizontally
+pd <- position_dodge(0.1) 
+
+
+
+#-------------------------
+#    Time*HR ~ Gender
+#-------------------------
+p1 = ggplot()  +
+  geom_point(data=SummaryHR3, size = 3.5, position = pd, aes(x = tadh, y= Mean, col=treatment)) +
+  geom_line(data = SummaryHR3, position = pd, aes(x=tadh, y=Mean, col = treatment)) +
+  geom_errorbar(data = SummaryHR3, position = pd, size = 0.8, width = 0.3, aes(ymin = Mean - 0, 
+                                      ymax= Mean+SD, x = tadh,  col = treatment), alpha = 0.7) + 
+  #ggtitle("Heart rate over time after administration of Metoprolol or placebo, including the mean and standard deviation ") + 
+  ylab("Heart rate (bpm)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(25,125) + xlim(-0.9,6.5) +
+  
+
+p1 = p1 + facet_wrap(~gender) + guides(fill = F)  + geom_vline(xintercept = 0, linetype = 'dotted') +
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+ 
+
+plot(p1)
+
+
+#-------------------------
+#    Time*HR ~ individual subjects
+#-------------------------
+p2 = ggplot(DataPD, aes(x = tadh, y=hr, col = treatment)) + 
+  geom_point(size = 3.5, alpha = 0.7) +
+  geom_line() +
+  #ggtitle("Heart rate over time per subjects after administration of Metoprolol or placebo, including CYPD26 allele activity score") + 
+  ylab("Heart rate (bpm)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(25,125) + xlim(-0.65,6)
+
+
+p2 = p2 + facet_wrap(gender~subjectnr + cyp_meta, nrow = 2, labeller = ) +
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) + 
+  geom_vline(xintercept = 0, linetype = 'dotted') +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22),
+        strip.text.x = element_text(size = 15),
+        legend.position="bottom",
+        legend.text=element_text(size=20),
+        legend.title=element_blank()) 
+
+plot(p2)
+
+
+#-------------------------
+#    Time* MEAN HR + SD ~ CYP metabolizer vs Gender 
+#-------------------------
+p3 = ggplot()  +
+  geom_point(data= SummaryHR, size = 3.5, position = pd,  aes(x = tadh, y= Mean, col=treatment)) +
+  geom_line(data = SummaryHR,  aes(x=tadh, y=Mean, col = treatment)) +
+  geom_errorbar(data = SummaryHR, position = pd, 
+                size = 0.8, width = 0.3, aes(ymin = Mean, ymax= Mean+SD, x = tadh, 
+                                                     col = treatment), alpha = 0.7) +
+  #ggtitle("Heart rate over time after administration of Metoprolol or placebo, including the mean and standard deviations") + 
+  ylab("Heart rate (bpm)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(25,125) + xlim(-0.9,6.5)
+
+p3 = p3 + facet_grid(gender ~ cyp_meta) + guides(fill = F)  + 
+  geom_vline(xintercept = 0, linetype = 'dotted') + 
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22),
+        strip.text = element_text(size = 15),
+        legend.position="bottom",
+        legend.text=element_text(size=20),
+        legend.title=element_blank()) 
+
+plot(p3)
+
+
+#DataPD$treatment = as.factor(DataPD$treatment)
+#-------------------------
+#    Time* HR ~ CYP metabolizer vs Occ
+#-------------------------
+p3a = ggplot(data= DataPD, aes(x = tadh, y= hr, col=treatment))  +
+  geom_point(aes(shape = treatment), size = 3.5, alpha = 0.7) +
+  geom_line(aes(group = subjectnr)) +
+  #ggtitle("Heart rate over time after administration of Metoprolol or placebo with different CYP2D6 allele activity scores\non occasion 1 or 2") + 
+  ylab("Heart rate (bpm)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(25,125) + xlim(-0.9,6.5)
+
+
+
+p3a = p3a + facet_grid(cyp_meta~occ) + guides(fill = F)  + 
+  geom_vline(xintercept = 0, linetype = 'dotted') + 
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22),
+        strip.text = element_text(size = 15),
+        legend.position="bottom",
+        legend.text=element_text(size=20),
+        legend.title=element_blank()) 
+
+plot(p3a)
+
+
+
+
+
+
+
+
+
+
+
+#-------------------------
+#    SUMMARISE Sys BP
+#-------------------------
+# Three dataframes are created to calculate Means, SD and CI
+
+
+# Calculate Meand and CI
+# Create SummarySysBP2, has one argument less than SummarySysBP
+# create new data frame consisting of the mean and lower and upper 
+# quantiles for a group specified in the 2nd argument (paste(tadh, gender, treatment)
+SummarySysBP2<-data.frame(
+  tadh=as.double(tapply(simset$tadh,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  gender=as.double(tapply(simset$gender,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  treatment=as.double(tapply(simset$treatment,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  mean=as.double(tapply(simset$systolic_bp,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  Lower=as.double(tapply(simset$systolic_bp,paste(simset$gender,simset$tadh, simset$treatment),
+                         quantile,0.025)),
+  Upper=as.double(tapply(simset$systolic_bp,paste(simset$gender,simset$tadh, simset$treatment),
+                         quantile,0.975))
+)
+
+
+
+
+# The variables in SummarySysBP and DataPD need to be recognized by R in the same way
+# Otherwise plotting won't be possible
+SummarySysBP2$gender = ifelse(SummarySysBP2$gender == 0, 'male', 'female')
+SummarySysBP2$treatment = ifelse(SummarySysBP2$ treatment == 1, 'placebo', 'metoprolol')
+
+
+
+
+
+# Summarise systolic_bp per timepoint, per treatment, gender and metabolizer
+SummarySysBP = select(DataPD, subjectnr, tadh, systolic_bp, treatment,  gender, cyp_meta)
+SummarySysBP = melt(data = SummarySysBP, id.vars=c("subjectnr", "tadh", "cyp_meta", "gender", "treatment"))
+SummarySysBP = data.frame(ddply(SummarySysBP, c("tadh", "treatment", "gender","cyp_meta",  "variable"), 
+                             summarise,
+                             Mean = round(mean(value), digits = 2),
+                             SD = round(sd(value), digits = 2),
+                             N = length(value)))
+
+
+# Summarise systolic_bp per timepoint, per treatment, gender and metabolizer
+SummarySysBP3 = select(DataPD, subjectnr, tadh, systolic_bp, treatment,  gender)
+SummarySysBP3 = melt(data = SummarySysBP3, id.vars=c("subjectnr", "tadh", "gender", "treatment"))
+SummarySysBP3 = data.frame(ddply(SummarySysBP3, c("tadh", "treatment", "gender",  "variable"), 
+                              summarise,
+                              Mean = round(mean(value), digits = 2),
+                              SD = round(sd(value), digits = 2),
+                              N = length(value)))
+
+
+
+
+
+
+#-------------------------
+#    Time*systolic_bp ~ Gender
+#-------------------------
+p4 = ggplot()  +
+  geom_point(data=SummarySysBP3, size = 3.5, position = pd, aes(x = tadh, y= Mean, col=treatment)) +
+  geom_line(data = SummarySysBP3, position = pd, aes(x=tadh, y=Mean, col = treatment)) +
+  geom_errorbar(data = SummarySysBP3, position = pd, size = 0.8, 
+                width = 0.3, aes(ymin = Mean - 0, ymax= Mean+SD, x = tadh,  col = treatment), alpha = 0.7) + 
+  #ggtitle("Systolic blood pressure over time after administration of Metoprolol or placebo, including the mean and standard deviation") + 
+  ylab("Systolic blood pressure (mmHg)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(80,140) + xlim(-0.9,6.5) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22))
+
+p4 = p4 + facet_wrap(~gender) + guides(fill = F)  + geom_vline(xintercept = 0, linetype = 'dotted') +
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  theme(strip.text.x = element_text(size = 15),
+        legend.position="bottom",
+        legend.text=element_text(size=20),
+        legend.title=element_blank()) 
+
+plot(p4)
+
+
+#-------------------------
+#    Time*systolic_bp ~ individual subjects
+#-------------------------
+p5 = ggplot(DataPD, aes(x = tadh, y=systolic_bp, col = treatment)) + 
+  geom_point(size = 3.5, alpha = 0.7) +
+  geom_line() +
+  #ggtitle("Systolic blood pressure over time per subjects after administration of Metoprolol or placebo, including the CYP2D6 allele activity score") + 
+  ylab("Systolic blood pressure (mmHg)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(80,140) + xlim(-0.65,6)
+
+
+p5 = p5 + facet_wrap(gender~subjectnr + cyp_meta , nrow = 2) +
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) + 
+  geom_vline(xintercept = 0, linetype = 'dotted') +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22),
+        strip.text.x = element_text(size = 15),
+        legend.position="bottom",
+        legend.text=element_text(size=20),
+        legend.title=element_blank()) 
+
+plot(p5)
+
+
+#-------------------------
+#    Time* MEAN systolic_bp + SD ~ CYP metabolizer vs Gender 
+#-------------------------
+p6 = ggplot()  +
+  geom_point(data= SummarySysBP, size = 3.5, position = pd,  aes(x = tadh, y= Mean, col=treatment)) +
+  geom_line(data = SummarySysBP,  aes(x=tadh, y=Mean, col = treatment)) +
+  geom_errorbar(data = SummarySysBP, position = pd, size = 0.8, 
+                width = 0.3, aes(ymin = Mean, ymax= Mean+SD, x = tadh,  col = treatment), alpha = 0.7) +
+                                                                             
+  #ggtitle("Systolic blood pressure over time after administration of Metoprolol or placebo, including the mean and standard deviations") + 
+  ylab("Systolic blood pressure (mmHg)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(80,140) + xlim(-0.9,6.5)
+
+p6 = p6 + facet_grid(gender ~ cyp_meta) + guides(fill = F)  + 
+  geom_vline(xintercept = 0, linetype = 'dotted') + 
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22),
+        strip.text = element_text(size = 15),
+        legend.position="bottom",
+        legend.text=element_text(size=20),
+        legend.title=element_blank()) 
+
+plot(p6)
+
+
+
+#-------------------------
+#    Time* systolic_bp ~ CYP metabolizer vs Gender 
+#-------------------------
+p6a = ggplot(data= DataPD,  aes(x = tadh, y= systolic_bp, col=treatment)) +
+  geom_point(aes(shape = treatment), size = 3.5) +
+  geom_line(aes(group = subjectnr)) +
+  #ggtitle("Systolic blood pressure over time after administration of Metoprolol or placebo with different CYP2D6 allele activity") + 
+  ylab("Systolic blood pressure (mmHg)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(80,140) + xlim(-0.9,6.5)
+
+
+
+p6a = p6a + facet_grid(cyp_meta~occ) + guides(fill = F)  + 
+  geom_vline(xintercept = 0, linetype = 'dotted') + 
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22),
+        strip.text = element_text(size = 15),
+        legend.position="bottom",
+        legend.text=element_text(size=20),
+        legend.title=element_blank()) 
+
+plot(p6a)
+
+
+
+
+
+
+
+#-------------------------
+#    SUMMARISE Dia BP
+#-------------------------
+# Three dataframes are created to calculate Means, SD and CI
+
+
+# Calculate Meand and CI
+# Create SummaryDiaBP2, has one argument less than SummaryDiaBP
+# create new data frame consisting of the mean and lower and upper 
+# quantiles for a group specified in the 2nd argument (paste(tadh, gender, treatment)
+SummaryDiaBP2<-data.frame(
+  tadh=as.double(tapply(simset$tadh,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  gender=as.double(tapply(simset$gender,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  treatment=as.double(tapply(simset$treatment,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  mean=as.double(tapply(simset$diastolic_bp,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  Lower=as.double(tapply(simset$diastolic_bp,paste(simset$gender,simset$tadh, simset$treatment),
+                         quantile,0.025)),
+  Upper=as.double(tapply(simset$diastolic_bp,paste(simset$gender,simset$tadh, simset$treatment),
+                         quantile,0.975))
+)
+
+
+
+
+# The variables in SummaryDiaBP and DataPD need to be recognized by R in the same way
+# Otherwise plotting won't be possible
+SummaryDiaBP2$gender = ifelse(SummaryDiaBP2$gender == 0, 'male', 'female')
+SummaryDiaBP2$treatment = ifelse(SummaryDiaBP2$ treatment == 1, 'placebo', 'metoprolol')
+
+
+
+
+
+# Summarise diastolic_bp per timepoint, per treatment, gender and metabolizer
+SummaryDiaBP = select(DataPD, subjectnr, tadh, diastolic_bp, treatment,  gender, cyp_meta)
+SummaryDiaBP = melt(data = SummaryDiaBP, id.vars=c("subjectnr", "tadh", "cyp_meta", "gender", "treatment"))
+SummaryDiaBP = data.frame(ddply(SummaryDiaBP, c("tadh", "treatment", "gender","cyp_meta",  "variable"), 
+                                summarise,
+                                Mean = round(mean(value), digits = 2),
+                                SD = round(sd(value), digits = 2),
+                                N = length(value)))
+
+
+# Summarise diastolic_bp per timepoint, per treatment, gender and metabolizer
+SummaryDiaBP3 = select(DataPD, subjectnr, tadh, diastolic_bp, treatment,  gender)
+SummaryDiaBP3 = melt(data = SummaryDiaBP3, id.vars=c("subjectnr", "tadh", "gender", "treatment"))
+SummaryDiaBP3 = data.frame(ddply(SummaryDiaBP3, c("tadh", "treatment", "gender",  "variable"), 
+                                 summarise,
+                                 Mean = round(mean(value), digits = 2),
+                                 SD = round(sd(value), digits = 2),
+                                 N = length(value)))
+
+
+
+
+
+
+#-------------------------
+#    Time*diastolic_bp ~ Gender
+#-------------------------
+p7 = ggplot()  +
+  geom_point(data=SummaryDiaBP3, size = 3.5, position = pd, aes(x = tadh, y= Mean, col=treatment)) +
+  geom_line(data = SummaryDiaBP3, position = pd, aes(x=tadh, y=Mean, col = treatment)) +
+  geom_errorbar(data = SummaryDiaBP3, position = pd, size = 0.8, 
+                width = 0.3, aes(ymin = Mean - 0, ymax= Mean+SD, x = tadh,  col = treatment), alpha = 0.7) + 
+                                                                                  
+  #ggtitle("Diastolic blood pressure over time after administration of Metoprolol or placebo, including the mean and standard deviation") + 
+  ylab("Diastolic blood pressure (mmHg)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(40,90) + xlim(-0.9,6.5) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22))
+
+p7 = p7 + facet_wrap(~gender) + guides(fill = F)  + geom_vline(xintercept = 0, linetype = 'dotted') +
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  theme(strip.text.x = element_text(size = 20),
+        legend.position="bottom",
+        legend.text=element_text(size=20),
+        legend.title=element_blank()) 
+ 
+
+plot(p7)
+
+
+#-------------------------
+#    Time*diastolic_bp ~ individual subjects
+#-------------------------
+p8 = ggplot(DataPD, aes(x = tadh, y=diastolic_bp, col = treatment)) + 
+  geom_point(size = 3.5, alpha = 0.7) +
+  geom_line() +
+  #ggtitle("Diastolic blood pressure over time per subjects after administration of Metoprolol or placebo, including the CYP2D6 activity scores") + 
+  ylab("Diastolic blood pressure (mmHg)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(40,90) + xlim(-0.65,6)
+
+
+p8 = p8 + facet_wrap(gender~subjectnr + cyp_meta , nrow = 2) +
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) + 
+  geom_vline(xintercept = 0, linetype = 'dotted') +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22),
+        strip.text.x = element_text(size = 20),
+        legend.position="bottom",
+        legend.text=element_text(size=20),
+        legend.title=element_blank()) 
+
+plot(p8)
+
+
+#-------------------------
+#    Time* MEAN diastolic_bp + SD ~ CYP metabolizer vs Gender 
+#-------------------------
+p9 = ggplot()  +
+  geom_point(data= SummaryDiaBP, size = 3.5, position = pd,  aes(x = tadh, y= Mean, col=treatment)) +
+  geom_line(data = SummaryDiaBP,  aes(x=tadh, y=Mean, col = treatment)) +
+  geom_errorbar(data = SummaryDiaBP, position = pd, size = 0.8, 
+                width = 0.3, aes(ymin = Mean, ymax= Mean+SD, x = tadh,  col = treatment), alpha = 0.7) +
+                                                                                
+  #ggtitle("Diastolic blood pressure over time after administration of Metoprolol or placebo, including the mean and standard deviations") + 
+  ylab("Diastolic blood pressure (mmHg)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(40,90) + xlim(-0.9,6.5)
+
+p9 = p9 + facet_grid(gender ~ cyp_meta) + guides(fill = F)  + 
+  geom_vline(xintercept = 0, linetype = 'dotted') + 
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22),
+        strip.text = element_text(size = 15),
+        legend.position="bottom",
+        legend.text=element_text(size=20),
+        legend.title=element_blank()) 
+
+plot(p9)
+
+
+
+#-------------------------
+#    Time* Diastolic BP ~ CYP metabolizer vs Occ
+#-------------------------
+p9a = ggplot(data= DataPD, aes(x = tadh, y= hr, col=treatment))  +
+  geom_point(aes(shape = treatment), size = 3.5, alpha = 0.7) +
+  geom_line(aes(group = subjectnr)) +
+  #ggtitle("Diastolic blood pressure over time after administration of Metoprolol or placebo with different CYP2D6 allele activity scores\non occasion 1 or 2") + 
+  ylab("Diastolic blood pressure (mmHg)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(40,90) + xlim(-0.9,6.5)
+
+
+
+p9a = p9a + facet_grid(cyp_meta~occ) + guides(fill = F)  + 
+  geom_vline(xintercept = 0, linetype = 'dotted') + 
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22),
+        strip.text = element_text(size = 15),
+        legend.position="bottom",
+        legend.text=element_text(size=20),
+        legend.title=element_blank()) 
+
+plot(p9a)
+
+
+
+
+
+
+
+
+
+#-------------------------
+#    SUMMARISE Respiratory Rate
+#-------------------------
+# Three dataframes are created to calculate Means, SD and CI
+
+
+# Calculate Meand and CI
+# Create SummaryResp2, has one argument less than SummaryResp
+# create new data frame consisting of the mean and lower and upper 
+# quantiles for a group specified in the 2nd argument (paste(tadh, gender, treatment)
+SummaryResp2<-data.frame(
+  tadh=as.double(tapply(simset$tadh,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  gender=as.double(tapply(simset$gender,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  treatment=as.double(tapply(simset$treatment,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  mean=as.double(tapply(simset$respiratory_rate,paste(simset$gender,simset$tadh, simset$treatment),mean)),
+  Lower=as.double(tapply(simset$respiratory_rate,paste(simset$gender,simset$tadh, simset$treatment),
+                         quantile,0.025)),
+  Upper=as.double(tapply(simset$respiratory_rate,paste(simset$gender,simset$tadh, simset$treatment),
+                         quantile,0.975))
+)
+
+
+
+
+# The variables in SummaryResp and DataPD need to be recognized by R in the same way
+# Otherwise plotting won't be possible
+SummaryResp2$gender = ifelse(SummaryResp2$gender == 0, 'male', 'female')
+SummaryResp2$treatment = ifelse(SummaryResp2$ treatment == 1, 'placebo', 'metoprolol')
+
+
+
+
+
+# Summarise respiratory_rate per timepoint, per treatment, gender and metabolizer
+SummaryResp = select(DataPD, subjectnr, tadh, respiratory_rate, treatment,  gender, cyp_meta)
+SummaryResp = melt(data = SummaryResp, id.vars=c("subjectnr", "tadh", "cyp_meta", "gender", "treatment"))
+SummaryResp = data.frame(ddply(SummaryResp, c("tadh", "treatment", "gender","cyp_meta",  "variable"), 
+                                summarise,
+                                Mean = round(mean(value), digits = 2),
+                                SD = round(sd(value), digits = 2),
+                                N = length(value)))
+
+
+# Summarise respiratory_rate per timepoint, per treatment, gender and metabolizer
+SummaryResp3 = select(DataPD, subjectnr, tadh, respiratory_rate, treatment,  gender)
+SummaryResp3 = melt(data = SummaryResp3, id.vars=c("subjectnr", "tadh", "gender", "treatment"))
+SummaryResp3 = data.frame(ddply(SummaryResp3, c("tadh", "treatment", "gender",  "variable"), 
+                                 summarise,
+                                 Mean = round(mean(value), digits = 2),
+                                 SD = round(sd(value), digits = 2),
+                                 N = length(value)))
+
+
+
+
+
+
+#-------------------------
+#    Time*respiratory_rate ~ Gender
+#-------------------------
+p10 = ggplot()  +
+  geom_point(data=SummaryResp3, size = 3.5, position = pd, aes(x = tadh, y= Mean, col=treatment)) +
+  geom_line(data = SummaryResp3, position = pd, aes(x=tadh, y=Mean, col = treatment)) +
+  geom_errorbar(data = SummaryResp3, position = pd, 
+                size = 0.8, width = 0.3, aes(ymin = Mean - 0, 
+               ymax= Mean+SD, x = tadh,  col = treatment), alpha = 0.7) + 
+  #ggtitle("Respiratory rate over time after administration of Metoprolol or placebo, including the mean and Confidence Interval") + 
+  ylab("Respiratory rate (per min)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(6,30) + xlim(-0.9,6.5) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22))
+
+p10 = p10 + facet_wrap(~gender) + guides(fill = F)  + geom_vline(xintercept = 0, linetype = 'dotted') +
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  theme(strip.text.x = element_text(size = 20),
+        legend.position="bottom",
+        legend.text=element_text(size=20),
+        legend.title=element_blank()) 
+
+plot(p10)
+
+
+#-------------------------
+#    Time*respiratory_rate ~ individual subjects
+#-------------------------
+p11 = ggplot(DataPD, aes(x = tadh, y=respiratory_rate, col = treatment)) + 
+  geom_point(size = 3.5, alpha = 0.7) +
+  geom_line() +
+  #ggtitle("Respiratory rate over time per subjects after administration of Metoprolol or placebo including the CYP2D6 activity scores") + 
+  ylab("Respiratory rate (per min)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(6,30) + xlim(-0.65,6)
+
+
+p11 = p11 + facet_wrap(gender~subjectnr + cyp_meta , nrow = 2) +
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) + 
+  geom_vline(xintercept = 0, linetype = 'dotted') +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22),
+        strip.text.x = element_text(size = 20),
+        legend.position="bottom",
+        legend.text=element_text(size=20),
+        legend.title=element_blank()) 
+
+plot(p11)
+
+
+#-------------------------
+#    Time* MEAN respiratory_rate + SD ~ CYP metabolizer vs Gender 
+#-------------------------
+p12 = ggplot()  +
+  geom_point(data= SummaryResp, size = 3.5, position = pd,  aes(x = tadh, y= Mean, col=treatment)) +
+  geom_line(data = SummaryResp,  aes(x=tadh, y=Mean, col = treatment)) +
+  geom_errorbar(data = SummaryResp, position = pd, size = 0.8, 
+                width = 0.3, aes(ymin = Mean, ymax= Mean+SD, x = tadh, col = treatment), alpha = 0.7) +
+                                                                                 
+  #ggtitle("Respiratory rate over time after administration of Metoprolol or placebo, including the mean and standard deviations") + 
+  ylab("Respiratory rate (per min)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(6,30) + xlim(-0.9,6.5)
+
+p12 = p12 + facet_grid(gender ~ cyp_meta)   + 
+  geom_vline(xintercept = 0, linetype = 'dotted') + 
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) +
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22),
+        strip.text = element_text(size = 20),
+        legend.text=element_text(size=20),
+        legend.position="bottom",
+        legend.title=element_blank())
+
+plot(p12)
+
+
+
+#-------------------------
+#    Time* respiratory_rate ~ CYP metabolizer vs Gender 
+#-------------------------
+p12a = ggplot(data= DataPD, aes(x = tadh, y= respiratory_rate, col=treatment))  +
+  geom_point(aes(shape = treatment), size = 3.5) +
+  geom_line(aes(group = subjectnr)) +
+  #ggtitle("Respiratory rate over time after administration of Metoprolol or placebo with different CYP allele activity") + 
+  ylab("Respiratory rate (per min)") + 
+  xlab("Time after dosing (hours)") +
+  ylim(5,30) + xlim(-0.9,6.5)
+
+
+
+p12a = p12a + facet_grid(cyp_meta~occ) + 
+  geom_vline(xintercept = 0, linetype = 'dotted') + 
+  theme(panel.background = element_rect(fill = "lightgrey", colour = "white", size = 4)) +
+  scale_color_manual(values = c('metoprolol' = 'blue', 'placebo' = 'orange')) +
+  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=22),
+        plot.title = element_text(size = 22),
+        strip.text = element_text(size = 20),
+        legend.text=element_text(size=20),
+        legend.position="bottom",
+        legend.title=element_blank())
+
+plot(p12a)
+
+
+
+
+
+
+
+
+#------------------
+#    MERGE PK & PD DATA
+#------------------
+DataPK = read.table(file = "../Data/CleanData/CHDR1518_DataPK_2018-06-08.csv", sep = ',', header = T )
+
+
+# Remove timepoints at which no PD measurements were done (= time 0.67 hr)
+DataPK = DataPK[DataPK$tadh != 0.67,]
+DataPK = select(DataPK, subjectnr, tadh, parameter1, conc1, parameter2, conc2, dose)
+
+# Remove timepoints at which no PK measurements were done (= time 0.13 hr)
+DataPD1 = DataPD
+DataPD1 = DataPD1[DataPD1$tadh != 0.13,]
+DataPD1 = DataPD1[DataPD1$tadh != 0.67,]
+
+# Change timepoints to match them with timepoints of the PK measurements
+DataPD1$tadh = DataPD1$tadh + 0.02
+DataPD1$tadh = ifelse(DataPD1$tadh == 0.34, DataPD1$tadh - 0.01, DataPD1$tadh)
+
+# 
+PKPD = merge(DataPD1, DataPK, by = c('subjectnr', 'tadh'))
+PKPD = PKPD[PKPD$treatment == 'metoprolol',]
+
+#-------------------------
+#    SAVE PKPD DATA
+#-------------------------
+write.table(PKPD , file = paste("../Data/CleanData/CHDR1518_DataPKPD_",Sys.Date(),".csv", sep = ''), 
+            row.names=FALSE, na = "", col.names=T, sep=",")
+
+
+
+#-------------------------
+#    SAVE PLOTS
+#-------------------------
+# Plots WITH titles
+png("../Plots/PD/CHDR1518_PD_HR_Gender_Mean_SD.png",width = 15, height = 7, units='in',res=600)
+plot(p1)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_HR_Individualplots.png",width = 15, height = 7, units='in',res=600)
+plot(p2)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_HR_Gender_Metabolizer_Mean_SD.png",width = 15, height = 7, units='in',res=600)
+plot(p3)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_HR_Metabolizer_Occasion.png",width = 15, height = 7, units='in',res=600)
+plot(p3a)
+
+dev.off()
+
+
+png("../Plots/PD/CHDR1518_PD_SysBP_Gender_Mean_SD.png",width = 15, height = 7, units='in',res=600)
+plot(p4)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_SysBP_Individualplots.png",width = 15, height = 7, units='in',res=600)
+plot(p5)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_SysBP_Gender_Metabolizer_Mean_SD.png",width = 15, height = 7, units='in',res=600)
+plot(p6)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_SysBP_Metabolizer_Occasion.png",width = 15, height = 7, units='in',res=600)
+plot(p6a)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_DiaBP_Gender_Mean_SD.png",width = 15, height = 7, units='in',res=600)
+plot(p7)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_DiaBP_Individualplots.png",width = 15, height = 7, units='in',res=600)
+plot(p8)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_DiaBP_Gender_Metabolizer_Mean_SD.png",width = 15, height = 7, units='in',res=600)
+plot(p9)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_DiaBP_Metabolizer_Occasion.png",width = 15, height = 7, units='in',res=600)
+plot(p9a)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_Resp_Gender_Mean_SD.png",width = 15, height = 7, units='in',res=600)
+plot(p10)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_Resp_Individualplots.png",width = 15, height = 7, units='in',res=600)
+plot(p11)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_Resp_Gender_Metabolizer_Mean_SD.png",width = 15, height = 7, units='in',res=600)
+plot(p12)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_Resp_Metabolizer_Occasion.png",width = 15, height = 7, units='in',res=600)
+plot(p12a)
+
+dev.off()
+
+
+
+
+
+
+#-------------------------
+#    SAVE PLOTS WITHOUT TITLES
+#-------------------------
+# Plots WITHOUT titles
+png("../Plots/PD/CHDR1518_PD_HR_Gender_Mean_SD_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p1)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_HR_Individualplots_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p2)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_HR_Gender_Metabolizer_Mean_SD_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p3)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_HR_Metabolizer_Occasion_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p3a)
+
+dev.off()
+
+
+png("../Plots/PD/CHDR1518_PD_SysBP_Gender_Mean_SD_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p4)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_SysBP_Individualplots_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p5)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_SysBP_Gender_Metabolizer_Mean_SD_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p6)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_SysBP_Metabolizer_Occasion_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p6a)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_DiaBP_Gender_Mean_SD_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p7)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_DiaBP_Individualplots_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p8)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_DiaBP_Gender_Metabolizer_Mean_SD_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p9)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_DiaBP_Metabolizer_Occasion_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p9a)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_Resp_Gender_Mean_SD_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p10)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_Resp_Individualplots_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p11)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_Resp_Gender_Metabolizer_Mean_SD_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p12)
+
+dev.off()
+
+png("../Plots/PD/CHDR1518_PD_Resp_Metabolizer_Occasion_V2.0.png",width = 15, height = 7, units='in',res=600)
+plot(p12a)
+
+dev.off()
+##################################################################################
+############################# END OF SCRIPT ######################################
+##################################################################################
+

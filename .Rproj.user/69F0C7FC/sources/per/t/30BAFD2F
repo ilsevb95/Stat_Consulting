@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1574686699715.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "1637657550",
+    "id" : "30BAFD2F",
+    "lastKnownWriteTime" : 1536183900,
+    "last_content_update" : 1536183900,
+    "path" : "C:/Users/Ilse/OneDrive/Bio-PharmaceuticalSciences/CHDR/CHDR1518_Metoprolol/CHDR1518_Mixed_Model_Analysis_part1.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "520,6",
+        "scrollLine" : "510"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

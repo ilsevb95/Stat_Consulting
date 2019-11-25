@@ -83,12 +83,15 @@ Final model is fitted with REML
 ```{r}
 
 model_final <- lmer(ndi1_2 ~ ndi0 + hads0_anx + hads0_depr + time_fct + (1|id), 
-                    data = df_prediction, REML = T)
+                    data = df_train, REML = T)
 
 summary(model_final)
 
 
 ```
+
+
+
 
 Below we divide the data in 5 folds. Should we round the predictions to 0 digits?
 
@@ -112,9 +115,11 @@ loss <- numeric(K)
 for (k in 1:K){
   training <- df_prediction[fold.index!=k, ]
   validation <- df_prediction[fold.index==k, ]
-  training.fit <- model_final
+  training.fit <-  lmer(ndi1_2 ~ ndi0 + hads0_anx + hads0_depr + time_fct + (1|id), 
+                    data = training, REML = T)
   
-  validation.predict <- predict(training.fit, newdata=validation, type='response')
+  validation.predict <- predict(training.fit, newdata=validation, type='response', 
+                                allow.new.levels = T)
   loss[k] <- Loss(validation$ndi1_2, validation.predict)
 }
 

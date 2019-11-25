@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1574686159627.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2340346161",
+    "id" : "E979DA74",
+    "lastKnownWriteTime" : 1536183898,
+    "last_content_update" : 1536183898,
+    "path" : "C:/Users/Ilse/OneDrive/Bio-PharmaceuticalSciences/CHDR/CHDR1518_Metoprolol/Exploratoryplots_PD_CHDR1518.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "826,0",
+        "scrollLine" : "812"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

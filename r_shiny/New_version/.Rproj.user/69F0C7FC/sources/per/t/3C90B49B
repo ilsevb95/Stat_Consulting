@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1574689204021.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "252769033",
+    "id" : "3C90B49B",
+    "lastKnownWriteTime" : 1574723623,
+    "last_content_update" : 1574723623115,
+    "path" : "C:/Users/Ilse/OneDrive/StatisticalScience/Consulting/Client/Inital_data_analysis/r_shiny/New_version/server.R",
+    "project_path" : "server.R",
+    "properties" : {
+        "cursorPosition" : "107,17",
+        "scrollLine" : "80"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

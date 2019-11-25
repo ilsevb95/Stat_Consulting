@@ -54,6 +54,8 @@ theme <-  theme(#panel.background = element_rect(fill = "lightgrey", colour = "w
 shinyServer(function(input, output) {
   #output$time=input$time
   hads_tot <- reactive({input$hads_anx+input$hads_depr})
+  #hads_anx <- reactive({input$hads_anx})
+  #hads_depr <- reactive({input$hads_depr})
   pred1 <- reactive({predict(model_final,newdata=
                                data.frame(ndi0= input$NDI_0 , hads0=hads_tot(),time = 52,id=100), 
                              allow.new.levels=TRUE, interval="predict")})
