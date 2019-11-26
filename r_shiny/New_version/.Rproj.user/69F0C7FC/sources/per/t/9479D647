@@ -5,15 +5,15 @@
     "dirty" : false,
     "encoding" : "UTF-8",
     "folds" : "",
-    "hash" : "1991352879",
+    "hash" : "2738582245",
     "id" : "9479D647",
-    "lastKnownWriteTime" : 1574722628,
-    "last_content_update" : 1574722628439,
+    "lastKnownWriteTime" : 1574767276,
+    "last_content_update" : 1574767276389,
     "path" : "C:/Users/Ilse/OneDrive/StatisticalScience/Consulting/Client/Inital_data_analysis/r_shiny/New_version/ui.R",
     "project_path" : "ui.R",
     "properties" : {
-        "cursorPosition" : "24,33",
-        "scrollLine" : "11"
+        "cursorPosition" : "26,0",
+        "scrollLine" : "0"
     },
     "read_only" : false,
     "read_only_alternatives" : [

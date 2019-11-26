@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1574769451291.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "4169011980",
+    "id" : "5C723C96",
+    "lastKnownWriteTime" : 1574781459,
+    "last_content_update" : 1574781459978,
+    "path" : "C:/Users/Ilse/OneDrive/StatisticalScience/Consulting/Client/Inital_data_analysis/Part1_Initial_data_analysis.Rmd",
+    "project_path" : "Part1_Initial_data_analysis.Rmd",
+    "properties" : {
+        "cursorPosition" : "203,0",
+        "scrollLine" : "194"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

@@ -30,19 +30,21 @@ ui <- fluidPage(
   #  checkboxGroupInput(inputId = "time",label='time', c(52,104), selected=NULL)),
     
   mainPanel(
-    textOutput("case_depr"),
-    textOutput("case_anx"),
-    #plotOutput("plot1"),
-    textOutput("PredVal1"),
-    textOutput("PredVal2"),
+
     plotOutput("plot2"),
     h6("Disclaimer: The blue lines visualizes the average functional recovery (NDI) of 
        patients after neck surgery, based on the data from the NECK-trail. Therefore, it does
        take the HADS anxiety and depression scores after 52 and 104 weeks in consideration. 
        The gray interval around it is a 95 % confidence interval. Whereas, the red line is 
        the predicted functional recovery of a new patient, based only on its NDI & HADS 
-       anxiety and depression scores at baseline.")
-    
+       anxiety and depression scores at baseline."),
+    h4("Below the predicted NDI:"),
+    #plotOutput("plot1"),
+    textOutput("PredVal1"),
+    textOutput("PredVal2"),
+    h4("HADS dicotomized at baseline:"),
+    textOutput("case_depr"),
+    textOutput("case_anx")
     #verbatimTextOutput(outputId = "time")
     #verbatimTextOutput(outputId = "DepPrint")
     #plotOutput("hist")

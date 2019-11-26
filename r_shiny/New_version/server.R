@@ -71,7 +71,7 @@ shinyServer(function(input, output) {
                                data.frame(ndi0= input$NDI_0 , hads_anx0=hads_anx(), 
                                           hads_depr0=hads_depr(),
                                           time = 52,id=100), 
-                             allow.new.levels=TRUE, interval="predict") < 0, 0, 
+                                allow.new.levels=TRUE, interval="predict") < 0, 0, 
                             predict(model_final,newdata=
                                       data.frame(ndi0= input$NDI_0 , hads_anx0=hads_anx(), 
                                                  hads_depr0=hads_depr(),
