@@ -1,5 +1,5 @@
 ---
-title: "Part3_Prediction_Model"
+title: "Part4: Predictive Model"
 author: "Ilse van Beelen"
 date: "11/12/2019"
 output: html_document
@@ -57,7 +57,7 @@ str(df_prediction)
 # Center predictors
 df_prediction$ndi0_cnt <- df_prediction$ndi0 - mean(df_prediction$ndi0)
 df_prediction$hads0_tot_cnt <- df_prediction$hads0_tot - mean(df_prediction$hads0_tot)
-#df_prediction$time_fct_cnt <- df_prediction$time_fct - mean(df_prediction$time_fct)
+
 
 ```
 
@@ -72,32 +72,19 @@ $$NDI_{i1,i2} = \beta_0 + \beta_1 HADS_{i0} + \beta_2 NDI_{i0} + \beta_3 Time_{i
 i = 1,2,3, \ldots, 109$$
 
 ```{r}
-model_ml <- nlme::lme(ndi1_2 ~ ndi0 + time_fct + hads0_tot, method = "ML",
-                         random = ~1|id, data = df_prediction)
 
-model_ml2 <- nlme::lme(ndi1_2 ~ ndi0 + time_fct + hads0_tot, method = "ML",
-                         random = ~1|id, data = df_prediction)
-
-summary(model_ml)
-
-anova(model_ml, model_ml2)
 
 model_ml_cnt <- nlme::lme(ndi1_2 ~ ndi0_cnt + time_fct + hads0_tot_cnt, method = "ML",
                          random = ~1|id, data = df_prediction)
 
 summary(model_ml_cnt)
 
-model_final <- nlme::lme(ndi1_2 ~ ndi0 + hads0_tot + time_fct, method = "REML",
+model_final <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct, method = "REML",
                          random = ~1|id, data = df_prediction)
 
 summary(model_final)
 
-model_final2 <- nlme::lme(ndi1_2 ~ ndi0 + hads0_tot + time_fct, method = "REML",
-                         random = ~1+time_fct|id, data = df_prediction)
 
-summary(model_final2)
-
-anova(model_final, model_final2)
 
 model_final_coef <- data.frame(coef(summary(model_final)))
 xtable(model_final_coef)
@@ -123,7 +110,7 @@ training1 <- df_prediction[df_prediction$id != "L8141003", ]
 validation1 <- df_prediction[df_prediction$id == "L8105004",]
 training1 <- df_prediction[df_prediction$id != "L8105004", ]
 
-training.fit <-  lmer(ndi1_2 ~ ndi0 + hads0_tot + time_fct + (1|id), REML = T,
+training.fit <-  lmer(ndi1_2 ~ ndi0 + hads0_tot_cnt + time_fct + (1|id), REML = T,
                       data = training1)
 
 
@@ -140,9 +127,28 @@ training.fit <-  lmer(ndi1_2 ~ ndi0 + hads0_tot + time_fct + (1|id), REML = T,
 preds2 <- predictInterval(training.fit, newdata = validation2, n.sims = 999)
 validation2 <- cbind(validation2, preds2)
 
+# Make predictions for L8043008
+validation3 <- df_prediction[df_prediction$id == "L8043008",]
+training3 <- df_prediction[df_prediction$id != "L8043008",]
+
+training.fit <-  lmer(ndi1_2 ~ ndi0 + hads0_tot + time_fct + (1|id), REML = T,
+                      data = training3)
+
+preds3 <- predictInterval(training.fit, newdata = validation3, n.sims = 999)
+validation3 <- cbind(validation3, preds3)
+
+# Make predictions for L8061013
+validation4 <- df_prediction[df_prediction$id == "L8061013",]
+training4 <- df_prediction[df_prediction$id != "L8061013",]
+
+training.fit <-  lmer(ndi1_2 ~ ndi0 + hads0_tot + time_fct + (1|id), REML = T,
+                      data = training4)
+
+preds4 <- predictInterval(training.fit, newdata = validation4, n.sims = 999)
+validation4 <- cbind(validation4, preds4)
 
 # Combine predictions in one dataframe and plot the results
-predict_2id <- rbind(validation1, validation2)
+predict_4id <- rbind(validation1, validation2, validation3, validation4)
 
 ```
 
@@ -150,14 +156,16 @@ Plot the two predictions
 
 ```{r}
 
-predict_2id$time <- as.numeric(as.character(predict_2id$time_fct))
+predict_4id$time <- as.numeric(as.character(predict_4id$time_fct))
 
-predict_2id <- predict_2id %>%
+predict_4id <- predict_4id %>%
   #add_row(id = "L8141003", ndi1_2 = 44, fit = 44, time = 0, upr = 44, lwr = 44, .before = 1) %>%
   add_row(id = "L8105004", ndi1_2 = 44, fit = 44, time = 0, upr = 44, lwr = 44, .before = 1) %>%
-  add_row(id = "L8061024", ndi1_2 = 42, fit = 42, time = 0, upr = 42, lwr = 42, .before =  4)
+  add_row(id = "L8061024", ndi1_2 = 42, fit = 42, time = 0, upr = 42, lwr = 42, .before =  4) %>%
+  add_row(id = "L8043008", ndi1_2 = 36, fit = 36, time = 0, upr = 36, lwr = 36, .before =  7) %>%
+  add_row(id = "L8061013", ndi1_2 = 18, fit = 18, time = 0, upr = 18, lwr = 18, .before =  10)
 
-ppredict <- ggplot(data = predict_2id, aes(x = time, y = ndi1_2)) + 
+ppredict <- ggplot(data = predict_4id, aes(x = time, y = ndi1_2)) + 
   geom_line(size = 1.5, col = "black") +
   geom_point(size = 3, col = "black") +
   geom_line(aes(x = time, y = fit, col = id), size = 1.5) +

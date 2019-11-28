@@ -182,7 +182,9 @@ Now, we fit the data with REML instead of ML. All estimates of the predictors ar
 ```{r}
 
 #model_final <- nlme::lme(ndi ~ time + hads_tot, random = ~1|id, method= "REML", data = df_long)
-model_final <- nlme::lme(ndi ~ time_fct + hads_tot, method = "REML",
+df_long$hads_tot_cnt <- df_long$hads_tot - mean(df_long$hads_tot)
+
+model_final <- nlme::lme(ndi ~ time_fct + hads_tot_cnt, method = "REML",
                          random = ~1|id, data = df_long)
 summary(model_final)
 final_mod_summ <- coef(summary(model_final))
@@ -229,6 +231,7 @@ Plot marginal NDI with CI over time
 
 ```{r}
 
+# Plot only marginal mean
 p3 <- ggplot(data = df_emmeans, aes(x = time, y = prediction )) + geom_point() + 
   geom_line(col = "blue", size = 2) + 
   geom_point(col = "blue", size = 4) +
@@ -239,8 +242,29 @@ p3 <- ggplot(data = df_emmeans, aes(x = time, y = prediction )) + geom_point() +
 
 plot(p3)
 
+# Plot marginal + raw data
+p4 <- ggplot(data = df_emmeans, aes(x = time, y = prediction )) +  
+  geom_point(aes(x=time, y = ndi, col = id), size = 4, alpha = 0.3, data = df_long) +
+  geom_line(aes(x=time, y =ndi, group = id, col = id), alpha = 0.3, size = 1, data = df_long) +
+  theme(legend.position = "none") +
+  geom_ribbon(data=df_emmeans, aes(ymin= lwr, ymax= upr), alpha=0.7) +
+  geom_line( col = "blue", size = 3) + 
+  geom_point(col = "blue", size = 5) +
+  ylab("NDI")  + ylim(c(0,100)) + 
+  xlab("Time (weeks)") + theme
+
+plot(p4)
+
+
+
+
+
 png("Figures/Marginal_NDI.png",width = 15, height = 7, units='in',res=300)
 plot(p3)
+dev.off()
+
+png("Figures/Marginal&Raw_NDI.png",width = 15, height = 7, units='in',res=300)
+plot(p4)
 dev.off()
 
 ```

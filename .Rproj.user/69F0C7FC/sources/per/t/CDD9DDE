@@ -1,27 +1,27 @@
 {
     "collab_server" : "",
     "contents" : "",
-    "created" : 1574892074263.000,
+    "created" : 1574936228718.000,
     "dirty" : false,
     "encoding" : "",
     "folds" : "",
     "hash" : "0",
-    "id" : "22AB8E60",
+    "id" : "CDD9DDE",
     "lastKnownWriteTime" : 13511086649311301,
-    "last_content_update" : 1574892074263,
+    "last_content_update" : 1574936228718,
     "path" : null,
     "project_path" : null,
     "properties" : {
-        "cacheKey" : "FEDF02E6",
+        "cacheKey" : "873EFAD8",
         "caption" : "df_prediction",
-        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=df_prediction&cache_key=FEDF02E6",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=df_prediction&cache_key=873EFAD8",
         "displayedObservations" : 187,
         "environment" : "",
         "expression" : "df_prediction",
         "object" : "df_prediction",
         "preview" : 0,
         "totalObservations" : 187,
-        "variables" : 10
+        "variables" : 9
     },
     "read_only" : false,
     "read_only_alternatives" : [
