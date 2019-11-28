@@ -1,0 +1,177 @@
+---
+title: "Data visualization NECK trial"
+author: "Ilse van Beelen & Floor Komen"
+date: "11/27/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE, echo=TRUE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = "hide")
+```
+
+
+Goal of this script is to visualize the raw data, histograms and correlations between different variables
+
+# Set up
+
+```{r, results='hide'}
+
+rm(list = ls())
+#library(ggplot2)
+library(tidyverse)
+library(gridExtra)
+
+df_long <- read.csv("Data/data_final_2019-11-05.csv", sep = ",")
+
+df_long$time_fct <- as.factor(df_long$time_fct)
+str(df_long)
+
+# Set layout for all figures
+theme <- theme(panel.background = element_blank(),
+          panel.grid.major = element_line(colour = "darkgrey", size=0.5),
+          panel.grid.minor = element_line(colour = "grey", 
+                                          size=.25, 
+                                          linetype = "dashed"),
+          panel.border = element_blank(),
+          axis.line.x = element_line(colour = "black", 
+                                     size=0.5, 
+                                     lineend = "butt"),
+          axis.line.y = element_line(colour = "black", 
+                                     size=0.5),
+          axis.text=element_text(size=15),
+              axis.title=element_text(size=22),
+              plot.title = element_text(size = 22),
+              strip.text = element_text(size = 15),
+              legend.title = element_blank())
+
+
+```
+
+
+# Data summary
+
+We have 109 patients who are randomly assigned to 3 different surgeries (ACD, ACDF, ACDA). The NDI, HADS depression and HADS anxiety are measured at baseline, 1 year and 2 years after surgery. An earlier analysis of the data showed that the functional recovery measured, NDI, is not significantly different between the three surgeries.
+
+
+# Data visualization
+
+## NDI over time
+
+Below, the NDI score is visualized for each patient over time. In general, there is a decreasing trend over time. Except for a few subjects where the NDI increases over time.
+
+
+```{r}
+
+p1 <-  ggplot(data = df_long, aes(x = time, y = ndi, col = id))  +
+  geom_point(size = 4, alpha = 0.7) +
+  geom_line(aes(group = id), size = 1) +
+  #ggtitle("Raw data: NDI score over time") + 
+  ylab("NDI") + 
+  xlab("Time (weeks)") + theme(legend.position = "none") + 
+  theme 
+
+plot(p1)
+
+png("Figures/NDI_raw.png",width = 15, height = 7, units='in',res=300)
+plot(p1)
+dev.off()
+
+
+
+```
+
+
+### Demographics
+
+Histograms of NDI and HADS. The NDI is very skewed to the left. This could be a problem for the statistical analysis, because the response is expected to be roughly normally distributed. 
+
+```{r}
+
+p_demo <- df_long %>%
+  dplyr::select(ndi, hads_depr, hads_anx) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_histogram(bins = 30) + theme +
+  ggtitle("Histograms")
+
+plot(p_demo)
+
+png("Figures/Histograms.png",width = 15, height = 7, units='in',res=300)
+plot(p_demo)
+dev.off()
+
+```
+
+# Correlations between NDI and HADS anx/depres at different time points
+
+
+Correlation between NDI score and HADS anxiety score at baseline, 52 and 104 weeks
+
+```{r}
+
+ggplot(data = df_long, aes(x = hads_anx, y = ndi)) +
+  geom_point(size = 4) + geom_smooth(method=lm, se = F, size = 1.5) + 
+  facet_grid(~time) + theme +  
+  xlab("HADS anxiety score") + ylab("NDI score")
+
+```
+
+Correlation between NDI score and HADS depression score at baseline, 52 and 104 weeks
+
+```{r}
+
+ggplot(data = df_long, aes(x = hads_depr, y = ndi)) +  
+  geom_point(size = 4) + geom_smooth(method=lm, se = F, size = 1.5) + 
+  facet_grid(~time) + theme + 
+  xlab("HADS depression score") + ylab("NDI score")
+
+```
+
+
+Correlation between HADS anxiety and HADS depression score at baseline, 52 and 104 weeks
+
+```{r}
+
+ggplot(data = df_long, aes(x = hads_depr, y = hads_anx)) +  
+  geom_point(size = 4) + geom_smooth(method=lm, se = F, size = 1.5) + 
+  facet_grid(~time) + theme + 
+  xlab("HADS depression score") + ylab("HADS anxiety score")
+
+```
+
+# Correlation between NDI scores at different time points
+
+
+```{r, results="hide"}
+
+# Correlation between NDI at baseline and after 1 year. And correlation between NDI at baseline and after 2 years.
+df_corr <- df_long %>%
+  select(id, time, ndi) %>%
+  spread(key = time, value = ndi, sep = "_ndi")
+
+df_corr2 <- df_long %>%
+  select(id, time, hads_tot) %>%
+  spread(key = time, value = hads_tot, sep = "_hads")
+
+
+df_corr <- left_join(df_corr, df_corr2, "id")
+
+
+p3 <- ggplot(data = df_corr, aes(x = time_ndi0 , y = time_ndi52)) +  
+  geom_point(size = 4) + geom_smooth(method=lm, se = F, size = 1.5) + 
+  xlab("NDI score baseline") + ylab("NDI score 52 weeks") + theme
+
+plot(p3)
+
+p4 <- ggplot(data = df_corr, aes(x = time_ndi0 , y = time_ndi104)) +  
+  geom_point(size = 4) + geom_smooth(method=lm, se = F, size = 1.5) + 
+
+  xlab("NDI score baseline") + ylab("NDI score 104 weeks") + theme
+
+plot(p4)
+grid.arrange(p3, p4, nrow = 1)
+
+```
+
+

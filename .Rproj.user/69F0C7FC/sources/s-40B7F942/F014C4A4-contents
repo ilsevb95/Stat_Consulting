@@ -5,17 +5,19 @@ date: "11/12/2019"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+```{r setup, include=FALSE, echo=TRUE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = "hide")
 ```
 
+Goal: create a prediction model for the NDI at 52 and 104 weeks, using the NDI, HADS anx & depres at baseline. 
+
+# Set up
 
 ```{r}
 
-set.seed(19950306)
-
 # Load libraries
 rm(list = ls())
+set.seed(19950306)
 library(ggplot2)
 library(lme4)
 library(tidyverse)
@@ -46,56 +48,70 @@ theme <- theme(panel.background = element_blank(),
 
 
 
-df_long <- read.csv("Data/data_final_2019-11-05.csv", sep = ",")
+df_prediction <- read.csv("Data/data_final_prediction_2019-11-05.csv", sep = ",")
 
-# Some data wrangling
-df_long <- df_long %>% 
-  mutate(hads_tot = hads_depr + hads_anx) %>%
-  dplyr::select(id, ndi, time, hads_tot, hads_anx, hads_depr) %>%
-  mutate(ndi = as.numeric(ndi), time = as.numeric(time),
-         hads_tot = as.numeric(hads_tot), time_fct = as.factor(time))
-  
+df_prediction$time_fct <- as.factor(df_prediction$time_fct)
+str(df_prediction)
 
-# Create new dataframe with HADS at time = 0 & NDI at time = 0
-df_time0 <- df_long[df_long$time == 0, ]
-df_time0 <- dplyr::select(df_time0, id, ndi, hads_tot, hads_anx, hads_depr)
-colnames(df_time0) <-  c("id", "ndi0", "hads0_tot", "hads0_anx", "hads0_depr")
 
-# Create new dataframe with HADS and NDI at 52 and 104 weeks
-df_time1_2 <- df_long[df_long$time != 0, ]
-df_time1_2 <- dplyr::select(df_time1_2, id, ndi, time_fct)
-colnames(df_time1_2) <-  c("id", "ndi1_2", "time_fct")
-
-# Merge dataframes
-df_prediction <- merge(df_time1_2, df_time0, by = "id")
+# Center predictors
+df_prediction$ndi0_cnt <- df_prediction$ndi0 - mean(df_prediction$ndi0)
+df_prediction$hads0_tot_cnt <- df_prediction$hads0_tot - mean(df_prediction$hads0_tot)
+#df_prediction$time_fct_cnt <- df_prediction$time_fct - mean(df_prediction$time_fct)
 
 ```
 
 
 # Prediction Model
 
-Final model is fitted with REML
+Note: Final model is fitted with REML
 
-We fit the following prediction model. It turns out that Time is not significant, therefore we remove this variable. Note that the models below are fitting with Maximum Likelihood (ML)
+We fit the following prediction model, using ML. It turns out that Time is not significant, but we want to make predictions for the timepoints. Therefore, the variable can not be removed.
 
 $$NDI_{i1,i2} = \beta_0 + \beta_1 HADS_{i0} + \beta_2 NDI_{i0} + \beta_3 Time_{i1, i2} + b_{i0} + \varepsilon_{i1, i2} \\
 i = 1,2,3, \ldots, 109$$
 
 ```{r}
-model_final <- nlme::lme(ndi1_2 ~ ndi0 + hads0_anx + hads0_depr + time_fct, method = "REML",
+model_ml <- nlme::lme(ndi1_2 ~ ndi0 + time_fct + hads0_tot, method = "ML",
+                         random = ~1|id, data = df_prediction)
+
+model_ml2 <- nlme::lme(ndi1_2 ~ ndi0 + time_fct + hads0_tot, method = "ML",
+                         random = ~1|id, data = df_prediction)
+
+summary(model_ml)
+
+anova(model_ml, model_ml2)
+
+model_ml_cnt <- nlme::lme(ndi1_2 ~ ndi0_cnt + time_fct + hads0_tot_cnt, method = "ML",
+                         random = ~1|id, data = df_prediction)
+
+summary(model_ml_cnt)
+
+model_final <- nlme::lme(ndi1_2 ~ ndi0 + hads0_tot + time_fct, method = "REML",
                          random = ~1|id, data = df_prediction)
 
 summary(model_final)
 
+model_final2 <- nlme::lme(ndi1_2 ~ ndi0 + hads0_tot + time_fct, method = "REML",
+                         random = ~1+time_fct|id, data = df_prediction)
+
+summary(model_final2)
+
+anova(model_final, model_final2)
+
 model_final_coef <- data.frame(coef(summary(model_final)))
 xtable(model_final_coef)
 
-# Calculate ICC (amount of var explained)
-12.04098^2 / (12.04098^2 + 8.958211^2)
+# Calculate ICC (amount of var explained = 65 %
+12.1792^2 / (12.1792^2 + 8.952623^2)
 
 ```
 
-Make prediction for a "new patient" with 95 % confidence intervals. We do this twice
+
+## Plot predictions for two specific patients
+
+
+Make prediction for two patients with 95 % confidence intervals.
 
 ```{r}
 
@@ -107,21 +123,21 @@ training1 <- df_prediction[df_prediction$id != "L8141003", ]
 validation1 <- df_prediction[df_prediction$id == "L8105004",]
 training1 <- df_prediction[df_prediction$id != "L8105004", ]
 
-training.fit <-  lmer(ndi1_2 ~ ndi0 + hads0_anx + hads0_depr + time_fct + (1|id), 
-                    data = training1, REML = T)
+training.fit <-  lmer(ndi1_2 ~ ndi0 + hads0_tot + time_fct + (1|id), REML = T,
+                      data = training1)
 
 
-preds1 <- predictInterval(model_final, newdata = validation1, n.sims = 999)
+preds1 <- predictInterval(training.fit, newdata = validation1, n.sims = 999)
 validation1 <- cbind(validation1, preds1)
 
 # Make prediction for subject L8061024
 validation2 <- df_prediction[df_prediction$id == "L8061024",]
 training2 <- df_prediction[df_prediction$id != "L8061024",]
 
-training.fit <-  lmer(ndi1_2 ~ ndi0 + hads0_anx + hads0_depr + time_fct + (1|id), 
-                    data = training2, REML = T)
+training.fit <-  lmer(ndi1_2 ~ ndi0 + hads0_tot + time_fct + (1|id), REML = T,
+                      data = training2)
 
-preds2 <- predictInterval(model_final, newdata = validation2, n.sims = 999)
+preds2 <- predictInterval(training.fit, newdata = validation2, n.sims = 999)
 validation2 <- cbind(validation2, preds2)
 
 
@@ -160,10 +176,10 @@ dev.off()
 
 
 
-# Cross validation
+## Cross validation
 
 
-Below we divide the data in 5 folds
+Below we divide the data in 5 folds and make predictions. We calculate the Root Mean SQuared Error (RMSE) = 11.8. Meaning that on average the model while predicting makes an error of 11.8 NDI
 
 ```{r}
 

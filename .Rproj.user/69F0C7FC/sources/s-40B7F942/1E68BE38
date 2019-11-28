@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1574894063733.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "1E68BE38",
+    "lastKnownWriteTime" : 1574021501,
+    "last_content_update" : 1574021501,
+    "path" : "C:/Users/Ilse/OneDrive/StatisticalScience/Year1/MixedModels/LMM_Case_Study/Longitudinal_LMM.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "290,19",
+        "scrollLine" : "283"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

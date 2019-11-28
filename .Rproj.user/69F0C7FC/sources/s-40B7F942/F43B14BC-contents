@@ -1,18 +1,22 @@
 ---
-title: "Statistical Consulting Mixed Model Analysis"
+title: "Explanatory Mixed Model Analysis"
 author: "Ilse van Beelen & Floor Komen"
 date: "11/4/2019"
 output: html_document
 ---
 
-```{r setup, include=FALSE, echo=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE )
+```{r setup, include=FALSE, echo=TRUE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = "hide" )
 ```
 
 
+Goal: create a linear mixed model to describe/explain the increase/decrease of NDI over time. Here NDI is the outcome and the predictors are time, HADS anx and HADS depres
+
+# Set up
+
 ```{r, include=FALSE}
 # Load ggCaterpillar, used to plot the random intercept
-
+set.seed(19950306)
 
 rm(list = ls())
 library(ggplot2)
@@ -93,92 +97,28 @@ theme <- theme(panel.background = element_blank(),
 
 df_long <- read.csv("Data/data_final_2019-11-05.csv", sep = ",")
 
-df_long <- df_long %>% 
-  mutate(hads_tot = hads_depr + hads_anx) %>%
-  select(id, ndi, time, hads_tot, hads_anx, hads_depr ) %>%
-  mutate(ndi = as.numeric(ndi), time = as.numeric(time),
-         hads_tot = as.numeric(hads_tot), time_fct = as.factor(time))
-  
 
-
+df_long$time_fct <- as.factor(df_long$time_fct)
+str(df_long)
 
 ```
 
-
-# Correlation plots
-
-We create a new dataframe where we have a seperate column for NDI after 0, 1 and 2 years
-
-```{r, results='hide'}
-
-df_corr <- df_long %>%
-  select(id, time, ndi) %>%
-  #gather(variable, value, -c(ndi:hads_depr)) %>%
-  #unite(temp, student, variable) %>%
-  #spread(temp, value)
-  spread(key = time, value = ndi, sep = "_ndi")
-
-df_corr2 <- df_long %>%
-  select(id, time, hads_tot) %>%
-  #gather(variable, value, -c(ndi:hads_depr)) %>%
-  #unite(temp, student, variable) %>%
-  #spread(temp, value)
-  spread(key = time, value = hads_tot, sep = "_hads")
-
-
-df_corr <- left_join(df_corr, df_corr2, "id")
-
-```
-
-
-```{r}
-
-p1 <- ggplot(data = df_corr, aes(x = time_ndi0 , y = time_ndi52)) +  
-  geom_point(size = 4) + geom_smooth(method=lm, se = F, size = 1.5) + 
-  #geom_text(x = 5, y = 80, label = lm_eqn(df_long, x = "hads_anx", y = "ndi"), parse = TRUE) + 
-  xlab("NDI score baseline") + ylab("NDI score after 1 years") + theme
-
-p2 <- ggplot(data = df_corr, aes(x = time_ndi0 , y = time_ndi104)) +  
-  geom_point(size = 4) + geom_smooth(method=lm, se = F, size = 1.5) + 
-  #geom_text(x = 5, y = 80, label = lm_eqn(df_long, x = "hads_anx", y = "ndi"), parse = TRUE) + 
-  xlab("NDI score baseline") + ylab("NDI score after 2 years") + theme
-
-cor.test(df_corr$time_ndi0, df_corr$time_ndi52)
-cor.test(df_corr$time_ndi0, df_corr$time_ndi104)
-
-p1p2 <- grid.arrange(p1, p2, nrow=1)
-
-png("Figures/Corr_NDI.png",width = 15, height = 7, units='in',res=300)
-plot(p1p2)
-dev.off()
-
-
-```
-
-# Multiple linear model
-
-```{r}
-
-lm1 <- lm(time_ndi104 ~ time_ndi0 + time_hads0, data = df_corr)
-summary(lm1)
-
-```
 
 
 
 # Linear Mixed Model Analysis
 
-We tested several models. Statistically speaking model4 is best, but we choose the parameters based on clinical importance. Therefore, model 5 is choosen.
+We tested several models. HADS anx and depres are highly correlated ($R^2 = 0.8$). If you add them together, one is suddenly no longer significant. It is best to combine them in `hads_tot`, since they explain to same information.
 
 ```{r}
 
 model1 <- nlme::lme(ndi ~ time_fct, random = ~1|id, method= "ML", data = df_long)
-model2 <- nlme::lme(ndi ~ time_fct + hads_tot, random = ~1|id, method= "ML", data = df_long)
-model3 <- nlme::lme(ndi ~ time_fct + hads_tot + time:hads_tot, random = ~1|id, method= "ML", 
+model2 <- nlme::lme(ndi ~ time_fct + hads_anx, random = ~1|id, method= "ML", data = df_long)
+model3 <- nlme::lme(ndi ~ time_fct + hads_depr, random = ~1|id, method= "ML", 
                     data = df_long)
-model4 <- nlme::lme(ndi ~ time_fct  + hads_depr, random = ~1|id, method= "ML", 
+model4 <- nlme::lme(ndi ~ time_fct  + hads_depr + hads_anx, random = ~1|id, method= "ML", 
                     data = df_long)
-model5 <- nlme::lme(ndi ~ time_fct + hads_anx + hads_depr, random = ~1|id, method= "ML", 
+model5 <- nlme::lme(ndi ~ time_fct + hads_tot, random = ~1|id, method= "ML", 
                     data = df_long)
 
 anova(model1, model2)
@@ -200,7 +140,7 @@ vif(model5)
 ```
 
 
-## Check assumptions model5
+## Check assumptions
 
 We assume the folowing:
 
@@ -228,21 +168,21 @@ abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
 text(x = 1:length(cooksd) , y=cooksd, labels=ifelse(cooksd> 4*mean(cooksd, na.rm = T),
                                                     1:length(cooksd),""), col="blue", pos =2)
 
-df_long[c(289, 27, 287, 143), ]
+df_long[c(251, 27, 287, 143), ]
 
 
 
 ```
 
 
-## Best fitting is model5
+## Fit final model with REML
 
-Now, we fit the data with REML instead of ML. All estimates of the predictors are significant, except HADS anxiety. We also calculate the Intra-class correlation (perc of var explained)
+Now, we fit the data with REML instead of ML. All estimates of the predictors are significant. We also calculate the Intra-class correlation (perc of var explained)
 
 ```{r}
 
 #model_final <- nlme::lme(ndi ~ time + hads_tot, random = ~1|id, method= "REML", data = df_long)
-model_final <- nlme::lme(ndi ~ time_fct + hads_anx + hads_depr, method = "ML",
+model_final <- nlme::lme(ndi ~ time_fct + hads_tot, method = "REML",
                          random = ~1|id, data = df_long)
 summary(model_final)
 final_mod_summ <- coef(summary(model_final))
@@ -250,10 +190,10 @@ xtable(final_mod_summ)
 
 
 # Calculate the intra class correlation:
-# Model explains only 47.3 % of variance
+# Model explains only 47 % of variance
 random_effects <- VarCorr(model_final)
 print(random_effects,comp=c("Variance"))
-79.54823 / (79.54823 + 88.6839)
+9.126886^2 / (9.126886^2 + 9.713318^2)
 
 ```
 
@@ -262,9 +202,8 @@ print(random_effects,comp=c("Variance"))
 
 ```{r}
 
-
 rr1 <- ranef(model_final,  condVar = T)
-ggCaterpillar(rr1, QQ = F, likeDotplot = T)
+#ggCaterpillar(rr1, QQ = F, likeDotplot = T)
 
 ```
 
@@ -286,7 +225,7 @@ df_emmeans$upr <- df_emmeans$prediction + 1.96*df_emmeans$SE
 ```
 
 
-Plot average NDI with CI over time
+Plot marginal NDI with CI over time
 
 ```{r}
 
@@ -295,9 +234,10 @@ p3 <- ggplot(data = df_emmeans, aes(x = time, y = prediction )) + geom_point() +
   geom_point(col = "blue", size = 4) +
   geom_ribbon(data=df_emmeans, aes(ymin= lwr, ymax= upr), alpha=0.3) + 
   theme(legend.position = "none") +
-  ylab("NDI")  +
+  ylab("NDI")  + ylim(c(0,50)) + 
   xlab("Time (weeks)") + theme
 
+plot(p3)
 
 png("Figures/Marginal_NDI.png",width = 15, height = 7, units='in',res=300)
 plot(p3)
@@ -305,7 +245,9 @@ dev.off()
 
 ```
 
-## Cross validation
+# Cross validation
+
+We use 5-fold Cross validation to calculate the Root Mean Squared Error (RMSE) = 11.3. Meaning that on average the model makes an error of 11.3 NDI when predicting
 
 ```{r}
 
@@ -327,9 +269,11 @@ loss <- numeric(K)
 for (k in 1:K){
   training <- df_long[fold.index!=k, ]
   validation <- df_long[fold.index==k, ]
-  training.fit <- model_final
+  training.fit <- lme4::lmer(ndi ~  time_fct + hads_anx + hads_depr + (1|id), 
+                    data = training, REML = T)
   
-  validation.predict <- predict(training.fit, newdata=validation, type='response')
+  validation.predict <- predict(training.fit, newdata=validation, type='response',
+                                 allow.new.levels = T)
   loss[k] <- Loss(validation$ndi, validation.predict)
 }
 
