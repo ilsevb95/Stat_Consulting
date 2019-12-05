@@ -16,9 +16,8 @@ Goal: create a linear mixed model to describe/explain the increase/decrease of N
 
 ```{r, include=FALSE}
 # Load ggCaterpillar, used to plot the random intercept
-set.seed(19950306)
-
 rm(list = ls())
+set.seed(19950306)
 library(ggplot2)
 library(lme4)
 library(tidyverse)
@@ -93,12 +92,11 @@ theme <- theme(panel.background = element_blank(),
 ```{r, results='hide'}
 
 # Load libraries and read in data
-
-
 df_long <- read.csv("Data/data_final_2019-11-05.csv", sep = ",")
 
-
+# Create time factor & center HADS at its mean
 df_long$time_fct <- as.factor(df_long$time_fct)
+df_long$hads_tot_cnt <- df_long$hads_tot - mean(df_long$hads_tot)
 str(df_long)
 
 ```
@@ -180,10 +178,6 @@ df_long[c(251, 27, 287, 143), ]
 Now, we fit the data with REML instead of ML. All estimates of the predictors are significant. We also calculate the Intra-class correlation (perc of var explained)
 
 ```{r}
-
-#model_final <- nlme::lme(ndi ~ time + hads_tot, random = ~1|id, method= "REML", data = df_long)
-df_long$hads_tot_cnt <- df_long$hads_tot - mean(df_long$hads_tot)
-
 model_final <- nlme::lme(ndi ~ time_fct + hads_tot_cnt, method = "REML",
                          random = ~1|id, data = df_long)
 summary(model_final)
@@ -191,11 +185,22 @@ final_mod_summ <- coef(summary(model_final))
 xtable(final_mod_summ)
 
 
+```
+
+## Calculate the Intra-Class Correlation (ICC)
+
+```{r}
+
+model_icc <- nlme::lme(ndi ~ 1, method = "REML",
+                         random = ~1|id, data = df_long)
+summary(model_icc)
+
+
 # Calculate the intra class correlation:
-# Model explains only 47 % of variance
-random_effects <- VarCorr(model_final)
+# Model explains only 24 % of variance
+random_effects <- VarCorr(model_icc)
 print(random_effects,comp=c("Variance"))
-9.126886^2 / (9.126886^2 + 9.713318^2)
+102.9839 / ( 102.9839 + 331.8927)
 
 ```
 

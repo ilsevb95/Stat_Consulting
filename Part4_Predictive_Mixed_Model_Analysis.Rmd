@@ -51,13 +51,13 @@ theme <- theme(panel.background = element_blank(),
 df_prediction <- read.csv("Data/data_final_prediction_2019-11-05.csv", sep = ",")
 
 df_prediction$time_fct <- as.factor(df_prediction$time_fct)
-str(df_prediction)
 
 
-# Center predictors
+
+# Center predictors -> makes interpretation intercept easier
 df_prediction$ndi0_cnt <- df_prediction$ndi0 - mean(df_prediction$ndi0)
 df_prediction$hads0_tot_cnt <- df_prediction$hads0_tot - mean(df_prediction$hads0_tot)
-
+str(df_prediction)
 
 ```
 
@@ -74,11 +74,6 @@ i = 1,2,3, \ldots, 109$$
 ```{r}
 
 
-model_ml_cnt <- nlme::lme(ndi1_2 ~ ndi0_cnt + time_fct + hads0_tot_cnt, method = "ML",
-                         random = ~1|id, data = df_prediction)
-
-summary(model_ml_cnt)
-
 model_final <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct, method = "REML",
                          random = ~1|id, data = df_prediction)
 
@@ -89,8 +84,24 @@ summary(model_final)
 model_final_coef <- data.frame(coef(summary(model_final)))
 xtable(model_final_coef)
 
-# Calculate ICC (amount of var explained = 65 %
-12.1792^2 / (12.1792^2 + 8.952623^2)
+
+```
+
+## Calculate Intra-Class Correlation (ICC)
+
+This is the amount of variance explained
+
+```{r}
+
+model_icc <- nlme::lme(ndi1_2 ~ 1, method = "REML",
+                         random = ~1|id, data = df_prediction)
+
+summary(model_icc)
+
+
+# Calculate ICC (amount of var explained = 75 %
+15.56856^2 / (15.56856^2 + 8.937615^2)
+
 
 ```
 
@@ -217,8 +228,47 @@ for (k in 1:K){
   loss[k] <- Loss(validation$ndi1_2, validation.predict)
 }
 
+# Show RMSE + SD
 loss
-round(mean(loss), digits = 1)
+RMSE  <- round(mean(loss), digits = 1)
+RMSE
+round(sd(loss), digits = 1)
+
+# 95 % CI of RMSE
+RMSE_se <- sd(loss) / sqrt(K)
+lower <- round(mean(loss) - 1.96 * RMSE_se, digits = 1)
+upper  <- round(mean(loss) + 1.96 * RMSE_se, digits = 1)
+c(lower, upper)
+
+```
+
+## Plot histogram of predictions
+
+Barplot visualizes that the model underestimates
+
+```{r}
+# Create dataframe
+predictions <- round(validation.predict, digits = 0)
+validations <- validation$ndi1_2
+subject <- validation$id
+timepoint <- validation$time_fct
+id_time <- paste(subject, timepoint, sep = "-")
+
+df_hist_pred1 <- data.frame(id_time = id_time, id = subject, time = timepoint, 
+                            value = predictions, var = "predictions")
+df_hist_pred2 <- data.frame(id_time = id_time, id = subject, time = timepoint, 
+                            value = validations, var = "validations")
+df_hist_pred <- rbind(df_hist_pred1, df_hist_pred2)
+
+df_hist_pred <- df_hist_pred[order(df_hist_pred$time),]
+
+ggplot(data=df_hist_pred, aes(x=id_time, y=value, fill=var)) +
+  geom_bar(stat="identity", position=position_dodge())+
+  geom_text(aes(label=value), vjust=1.6, color="white",
+            position = position_dodge(0.9), size=3.5)+
+  ylab("NDI") + xlab("ID & visit") + 
+  scale_fill_brewer(palette="Reds") + theme + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) #+ facet_grid(~time)
 
 ```
 
