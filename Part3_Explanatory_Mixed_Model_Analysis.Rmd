@@ -27,6 +27,7 @@ library(car)
 library(lattice)
 library(xtable)
 library(gridExtra)
+library(groupdata2)
 
 
 ggCaterpillar <- function(re, QQ=TRUE, likeDotplot=TRUE) {
@@ -276,7 +277,60 @@ dev.off()
 
 # Cross validation
 
-We use 5-fold Cross validation to calculate the Root Mean Squared Error (RMSE) = 11.3. Meaning that on average the model makes an error of 11.3 NDI when predicting
+We use 5-fold Cross validation to calculate the Root Mean Squared Error (RMSE) = 13.2 and SD = 2. Meaning that on average the model makes an error of 13.2 NDI when predicting
+
+```{r}
+
+# Add new column with folds numbers
+K <- 5
+df_long <- fold(df_long, k = K, id_col = "id")
+
+
+# Create Loss function: Root Mean Squard Error
+Loss <- function(x, y){
+  mse <- sum((x-y)^2)/length(x)
+  rmse <- sqrt(mse)
+  return(rmse)
+}
+
+
+loss <- numeric(K)
+list_pred <- c()
+
+for (k in 1:K){
+  training <- df_long[df_long$.folds !=k, ]
+  validation <- df_long[df_long$.folds ==k, ]
+  training.fit <- lme4::lmer(ndi ~  time_fct + hads_anx + hads_depr + (1|id), 
+                    data = training, REML = T)
+  
+  validation.predict <- predict(training.fit, newdata=validation, type='response',
+                                 allow.new.levels = T)
+  loss[k] <- Loss(validation$ndi, validation.predict)
+  
+  # Save predictions in list
+  list_pred[[k]] <- validation %>%
+    dplyr::select(id, ndi, time_fct, .folds) %>%
+    mutate(pred = validation.predict)
+}
+
+
+# Show RMSE + SD
+loss
+RMSE  <- round(mean(loss), digits = 1)
+RMSE
+round(sd(loss), digits = 1)
+
+
+# 95 % CI of RMSE
+RMSE_se <- sd(loss) / sqrt(100)
+lower <- round(mean(loss) - 1.96 * RMSE_se, digits = 1)
+upper  <- round(mean(loss) + 1.96 * RMSE_se, digits = 1)
+c(lower, upper)
+
+```
+
+
+
 
 ```{r}
 
