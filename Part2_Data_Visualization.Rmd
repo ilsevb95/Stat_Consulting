@@ -17,7 +17,6 @@ Goal of this script is to visualize the raw data, histograms and correlations be
 ```{r, results='hide'}
 
 rm(list = ls())
-#library(ggplot2)
 library(tidyverse)
 library(gridExtra)
 
@@ -88,7 +87,7 @@ Histograms of NDI and HADS. The NDI is very skewed to the left. This could be a 
 ```{r}
 
 p_demo <- df_long %>%
-  dplyr::select(ndi, hads_depr, hads_anx) %>% 
+  dplyr::select(ndi, hads_tot) %>% 
   gather() %>% 
   ggplot(aes(value)) +
     facet_wrap(~ key, scales = "free") +
