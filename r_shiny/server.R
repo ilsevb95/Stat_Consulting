@@ -9,8 +9,9 @@ library(emmeans)
 library(car)
 library(lattice)
 
-
-df_long <- read.csv("data_final_2019-11-04.csv", header=TRUE)
+##Data preperation 
+df_long <- read.csv("data_final_2019-11-05.csv", header=TRUE)
+df_prediction <- read.csv("data_final_prediction_2019-11-05.csv")
 df_long <- df_long %>% 
   select(id, ndi, time, hads_depr, hads_anx) %>%
   mutate(ndi = as.numeric(ndi), time = as.numeric(time),
@@ -18,18 +19,8 @@ df_long <- df_long %>%
          time_fct = as.factor(time))
 
 
-df_time0 <- df_long[df_long$time == 0, ]
-df_time0 <- select(df_time0, id, ndi, hads_anx, hads_depr)
-colnames(df_time0) <-  c("id", "ndi0", "hads_anx0", "hads_depr0")
-# Create new dataframe with HADS and NDI at 52 and 104 weeks
-df_time1_2 <- df_long[df_long$time != 0, ]
-df_time1_2 <- select(df_time1_2, id, ndi, time)
-colnames(df_time1_2) <-  c("id", "ndi1_2", "time")
-# Merge dataframes
-df_prediction <- merge(df_time1_2, df_time0, by = "id")
 
-
-model_final <- lmer(ndi1_2 ~ ndi0 + hads_anx0 + hads_depr0 +  time + (1|id), 
+model_final <- lmer(ndi1_2 ~ ndi0 + hads0_tot+  time_fct + (1|id), 
                     data = df_prediction, 
                     REML = T) 
 
@@ -67,30 +58,25 @@ theme <- theme(panel.background = element_blank(),
 shinyServer(function(input, output) {
   hads_anx <- reactive({input$hads_anx})
   hads_depr <- reactive({input$hads_depr})
+  hads_tot <- reactive({hads_anx()+hads_depr()})
   pred1 <- reactive({round(ifelse(predict(model_final,newdata=
-                               data.frame(ndi0= input$NDI_0 , hads_anx0=hads_anx(), 
-                                          hads_depr0=hads_depr(),
-                                          time = 52,id=100), 
-                                allow.new.levels=TRUE, interval="predict") < 0, 0, 
-                            predict(model_final,newdata=
-                                      data.frame(ndi0= input$NDI_0 , hads_anx0=hads_anx(), 
-                                                 hads_depr0=hads_depr(),
-                                                 time = 52,id=100), 
-                                    allow.new.levels=TRUE, interval="predict")))})
-  #pred1 <- reactive({ifelse(pred1 > 0, 0, pred1)})
-  #pred1a <- reactive({as.numeric(round(pred1))})
+                                            data.frame(ndi0= input$NDI_0 , hads0_tot= hads_tot(),
+                                                       time_fct = 52,id=100), 
+                                          allow.new.levels=TRUE, interval="predict") < 0, 0, 
+                                  predict(model_final,newdata=
+                                            data.frame(ndi0= input$NDI_0 , hads0_tot=hads_tot(),
+                                                       time_fct = 52,id=100), 
+                                          allow.new.levels=TRUE, interval="predict")))})
+
   pred2 <- reactive({ifelse(round(predict(model_final,newdata=
-                               data.frame(ndi0= input$NDI_0 , hads_anx0=hads_anx(), 
-                                          hads_depr0=hads_depr(),
-                                          time = 104,id=100), 
-                             allow.new.levels=TRUE)) <0, 0, 
+                                            data.frame(ndi0= input$NDI_0 , hads0_tot=hads_tot(),
+                                                       time_fct = 104,id=100), 
+                                          allow.new.levels=TRUE)) <0, 0, 
                             round(predict(model_final,newdata=
-                                      data.frame(ndi0= input$NDI_0 , hads_anx0=hads_anx(), 
-                                                 hads_depr0=hads_depr(),
-                                                 time = 104,id=100), 
-                                    allow.new.levels=TRUE,  interval="predict")))})
-  #pred2a <- reactive(as.numeric(round(pred2)))
-  #pred2 <- reactive({ifelse(pred2 > 0, 0, pred2)})
+                                            data.frame(ndi0= input$NDI_0 , hads0_tot=hads_tot(),
+                                                       time_fct = 104,id=100), 
+                                          allow.new.levels=TRUE,  interval="predict")))})
+
   
   case_anxiety <- reactive( if (input$hads_anx<8){
     "Non case"}else if(input$hads_anx>10){"Case"}
@@ -103,9 +89,6 @@ shinyServer(function(input, output) {
   output$PredVal1 <- renderText({paste("Predicted NDI after 1 year:",pred1())})
   output$PredVal2 <- renderText({paste("Predicted NDI after 2 years:",pred2())})
   
-  #output$PredVal <- renderText(pred)
-  #x <- c(as.numeric(pred1),as.numeric(pred2))
-  #y <- c(52,104)
   output$plot1 <- renderPlot({
     
     plot(c(52,104),c(as.numeric(pred1()),as.numeric(pred2())), xlab = "Time (weeks)", 
@@ -127,6 +110,4 @@ shinyServer(function(input, output) {
       xlab("Time (weeks)") + ylab("NDI") + ylim(c(0,100))
   })
 })
-
-  
 

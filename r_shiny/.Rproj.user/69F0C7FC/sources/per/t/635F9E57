@@ -1,19 +1,19 @@
 {
     "collab_server" : "",
     "contents" : "",
-    "created" : 1573671342691.000,
+    "created" : 1576674817683.000,
     "dirty" : false,
     "encoding" : "UTF-8",
     "folds" : "",
-    "hash" : "2534543230",
-    "id" : "A77268D5",
-    "lastKnownWriteTime" : 1574766558,
-    "last_content_update" : 1574766558,
-    "path" : "C:/Users/Ilse/OneDrive/StatisticalScience/Consulting/Client/Inital_data_analysis/r_shiny/server.R",
+    "hash" : "1839489817",
+    "id" : "635F9E57",
+    "lastKnownWriteTime" : 1576674884,
+    "last_content_update" : 1576674884991,
+    "path" : "C:/Users/Ilse/OneDrive/StatisticalScience/Consulting/Client/Inital_data_analysis/r_shiny_2/server.R",
     "project_path" : "server.R",
     "properties" : {
-        "cursorPosition" : "98,0",
-        "scrollLine" : "48"
+        "cursorPosition" : "12,42",
+        "scrollLine" : "0"
     },
     "read_only" : false,
     "read_only_alternatives" : [
