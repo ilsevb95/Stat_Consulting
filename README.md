@@ -1,12 +1,9 @@
 ######################### READ ME #################################################
 
-By: Floor Komen & Ilse van Beelen
-
-Course: Statistical Consulting 
-
-contact information: f.a.komen@umail.leidenuniv.nl & i.p.van.beelen@umail.leideuniv.nl
-
-Date last update: 2019-12-23
+- By: Floor Komen & Ilse van Beelen
+- Course: Statistical Consulting 
+- contact information: f.a.komen@umail.leidenuniv.nl & i.p.van.beelen@umail.leideuniv.nl
+- Date last update: 2019-12-23
 
 This statistical analysis on this Github was performed as part of
 the course Statistical Consulting. The data used is from the NECK
@@ -22,10 +19,10 @@ trial. Two separate analysis are performed with the data:
 
 Explanation folders:
 
-NNT  	-->	Script for calculating NNT 
-Figures -->	Data visualization figures are saved here
-Data	-->	Raw data (as SPSS-files) and cleaned data (as data_final....csv)
-R_shiny	--> 	Scripts and data to run the R shiny app
+1) NNT  	-->	Script for calculating NNT 
+2) Figures 	-->	Data visualization figures are saved here
+3) Data		-->	Raw data (as SPSS-files) and cleaned data (as data_final....csv)
+4) R_shiny	--> 	Scripts and data to run the R shiny app
 
 Please note: data is not included in the Github
 
