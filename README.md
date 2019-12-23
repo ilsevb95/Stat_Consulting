@@ -1,4 +1,5 @@
 ######################### READ ME #################################################
+
 By: Floor Komen & Ilse van Beelen
 
 Course: Statistical Consulting 
@@ -27,4 +28,5 @@ Data	-->	Raw data (as SPSS-files) and cleaned data (as data_final....csv)
 R_shiny	--> 	Scripts and data to run the R shiny app
 
 Please note: data is not included in the Github
+
 #################### END #########################################################
