@@ -10,7 +10,7 @@ Date last update: 2019-12-23
 
 This statistical analysis on this Github was performed as part of
 the course Statistical Consulting. The data used is from the NECK
-trial. Two seperate analysis are performed with the data:
+trial. Two separate analysis are performed with the data:
 
 1) Analysis Patient perceived recovery (Number Needed to treat --> folder NNT) 
 2) Analysis Functional outcome --> in main folder
