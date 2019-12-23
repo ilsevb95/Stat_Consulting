@@ -85,27 +85,41 @@ df_prediction <- df_prediction %>%
 
 ```
 
+# Prediction Model: find best random effects
+
+Fit random intercept and model with random intercept + slope. Both fitted with REML
+
+```{r}
+
+# random intercept
+model_final <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct, method = "REML",
+                         random = ~1|id, data = df_prediction)
+
+# random intercept + slope
+model_final2 <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct, method = "REML",
+                         random = ~1+time_fct|id, data = df_prediction)
+
+
+anova(model_final, model_final2)
+
+
+```
+
 
 # Prediction Model
 
-Note: Final model is fitted with REML
-
-We fit the following prediction model, using ML. It turns out that Time is not significant, but we want to make predictions for the timepoints. Therefore, the variable can not be removed.
+We fit the following prediction model, using REML.
 
 $$NDI_{i1,i2} = \beta_0 + \beta_1 HADS_{i0} + \beta_2 NDI_{i0} + \beta_3 Time_{i1, i2} + b_{i0} + \varepsilon_{i1, i2} \\
 i = 1,2,3, \ldots, 109$$
 
 ```{r}
 
-df_prediction <- df_prediction %>%
-  drop_na(ndi1_2)
+# random intercept
 model_final <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct, method = "REML",
                          random = ~1|id, data = df_prediction)
 
 summary(model_final)
-
-
-
 model_final_coef <- data.frame(coef(summary(model_final)))
 xtable(model_final_coef)
 
@@ -131,10 +145,10 @@ summary(model_icc)
 ```
 
 
-## Plot predictions for two specific patients
+## Plot predictions for four specific patients
 
 
-Make prediction for two patients with 95 % confidence intervals.
+Make prediction for four patients with 95 % confidence intervals.
 
 ```{r}
 

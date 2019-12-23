@@ -184,7 +184,7 @@ model_int <- nlme::lme(ndi ~ time_fct + hads_tot_cnt, method = "REML",
                          random = ~1|id, data = df_long)
 
 model_int_slope <- nlme::lme(ndi ~ time_fct + hads_tot_cnt, method = "REML",
-                         random = ~1|time_fct, data = df_long)
+                         random = ~1+ time_fct|id, data = df_long)
 
 summary(model_int_slope)
 
@@ -219,13 +219,15 @@ xtable(final_mod_summ)
 model_icc <- nlme::lme(ndi ~ 1, method = "REML", random = ~1|id, data = df_long)
 summary(model_icc)
 
-model_icc_lmer <- lme4::lmer(ndi ~ 1 + (1|id), REML = T, data = df_long)
+model_icc_lmer <- lme4::lmer(ndi ~ 1 + (1 |id), REML = T, data = df_long)
 summary(model_icc_lmer)
 # Calculate the intra class correlation:
 # Model explains only 24 % of variance
 random_effects <- VarCorr(model_icc)
 print(random_effects,comp=c("Variance"))
 102.9839 / ( 102.9839 + 331.8927)
+
+
 
 ```
 
