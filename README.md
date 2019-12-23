@@ -1,7 +1,10 @@
 ######################### READ ME #################################################
 By: Floor Komen & Ilse van Beelen
+
 Course: Statistical Consulting 
+
 contact information: f.a.komen@umail.leidenuniv.nl & i.p.van.beelen@umail.leideuniv.nl
+
 Date last update: 2019-12-23
 
 This statistical analysis on this Github was performed as part of
