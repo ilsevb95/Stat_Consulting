@@ -1,0 +1,88 @@
+---
+title: "NNT"
+author: "Floor Komen"
+date: "4 november 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+```
+
+```{r}
+library(haven)
+Dataset_NECK_HADS_long <- read_sav("Dataset NECK HADS stuk 12-08-2019 long.sav")
+Dataset_NECK_met_herberekening_NDI <- read_sav("Dataset NECK met herberekening NDI.CG 2018 05 20.sav")
+
+```
+
+```{r}
+library(tidyr)
+library(dplyr)
+
+NNT_DATA_2_part1 <- Dataset_NECK_HADS_long %>%
+  #mutate(Dataset_NECK_met_herberekening_NDI$VLIK01)
+  filter(PMOMENTX == 104 ) %>%
+  select(PATIENTID, OPERATIE) %>%
+  na.omit()
+
+
+mutate2 <- Dataset_NECK_met_herberekening_NDI %>%
+  filter(PMOMENTX == 104, PATIENTID != "L8103004") %>% #That patient is not found in NNT_DATA_2 so is removed. 
+  select(PATIENTID, VLIK01) %>%
+  na.omit()
+
+NNT_DATA_2 <- merge(NNT_DATA_2_part1,mutate2, by="PATIENTID")
+
+
+```
+Calculate the proportion for the GAD 
+```{r}
+prop_ACD_lik <- NNT_DATA_2%>% #0.097
+  filter(OPERATIE == 1) %>%
+  summarise(prop_ACD=sum(VLIK01<3)/length(VLIK01))
+
+prop_ACDF_lik <- NNT_DATA_2%>% #0.029
+  filter(OPERATIE == 2) %>%
+  summarise(prop_ACDF=sum(VLIK01<3)/length(VLIK01))
+
+prop_ACDA_lik <- NNT_DATA_2%>% #0
+  filter(OPERATIE == 3) %>%
+  summarise(prop_ACDA=sum(VLIK01<3)/length(VLIK01))
+          
+c(prop_ACD_lik,prop_ACDF_lik,prop_ACDA_lik)
+```
+
+Calculate the NNT for the GAD 
+```{r}
+ 
+NNT_ACDF_ACD = 1/(prop_ACDF_lik-prop_ACD_lik) 
+NNT_ACDF_ACDA=1/(prop_ACDF_lik-prop_ACDA_lik) 
+NNT_ACD_ACDA=1/(prop_ACD_lik-prop_ACDA_lik)
+
+c(NNT_ACDF_ACD, NNT_ACDF_ACDA, NNT_ACD_ACDA)
+```
+
+Calculating the SE and CI for the ARR 
+```{r}
+SE_ACDF_ACD = sqrt((prop_ACDA_lik*(1-prop_ACDF_lik))/34 + (prop_ACD_lik*(1-prop_ACD_lik))/31)
+
+SE_ACDF_ACDA = sqrt((prop_ACDA_lik*(1-prop_ACDF_lik))/34 + (prop_ACDA_lik*(1-prop_ACDA_lik))/32)
+
+SE_ACD_ACDA = sqrt((prop_ACD_lik*(1-prop_ACD_lik))/31 + (prop_ACDA_lik*(1-prop_ACDA_lik))/32)
+```
+
+```{r}
+CIL_ACDF_ACD = 1/(1/NNT_ACDF_ACD - 1.96 * SE_ACDF_ACD) 
+CIU_ACDF_ACD = 1/(1/NNT_ACDF_ACD + 1.96 * SE_ACDF_ACD)
+
+CIL_ACDF_ACDA = 1/(1/NNT_ACDF_ACDA - 1.96 * SE_ACDF_ACDA)
+CIU_ACDF_ACDA = 1/(1/NNT_ACDF_ACDA + 1.96 * SE_ACDF_ACDA)
+
+CIL_ACD_ACDA = 1/(1/NNT_ACD_ACDA - 1.96 * SE_ACD_ACDA)
+CIU_ACD_ACDA = 1/(1/NNT_ACD_ACDA + 1.96 * SE_ACDF_ACDA)
+
+
+```
+
