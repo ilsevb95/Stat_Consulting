@@ -1,0 +1,100 @@
+---
+title: 'Part5: Improving predictions'
+author: "Ilse van Beelen"
+date: "1/20/2020"
+output: html_document
+---
+
+
+```{r setup, include=FALSE, echo=TRUE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = "hide")
+
+```
+
+Goal: create a prediction model for the NDI at 104 weeks, based on NDI, HADS anx & depres at baseline and 52 weeks. 
+
+# Set up
+
+```{r, warning=FALSE}
+
+# Load libraries
+rm(list = ls())
+set.seed(19950306)
+library(ggplot2)
+library(lme4)
+library(tidyverse)
+library(nlme)
+library(emmeans)
+library(car)
+library(lattice)
+library(merTools)
+library(xtable)
+library(caret)
+library(groupdata2)
+
+# Set layout for all figures
+theme <- theme(panel.background = element_blank(),
+          panel.grid.major = element_line(colour = "darkgrey", size=0.5),
+          panel.grid.minor = element_line(colour = "grey", 
+                                          size=.25, 
+                                          linetype = "dashed"),
+          panel.border = element_blank(),
+          axis.line.x = element_line(colour = "black", 
+                                     size=0.5, 
+                                     lineend = "butt"),
+          axis.line.y = element_line(colour = "black", 
+                                     size=0.5),
+          axis.text=element_text(size=15),
+              axis.title=element_text(size=22),
+              plot.title = element_text(size = 22),
+              strip.text = element_text(size = 15),
+              legend.title = element_blank())
+
+
+
+df_prediction <- read.csv("Data/data_final_prediction_2019-11-05.csv", sep = ",")
+
+
+
+# Center predictors -> makes interpretation intercept easier
+# Create new numbering voor de IDs -> for Cross validation
+df_prediction <- df_prediction %>% 
+  mutate(id_revalue = as.factor(group_indices_(.,.dots=list("id")))) %>%
+  mutate(time_fct = as.factor(time_fct)) %>%
+  mutate(ndi0_cnt =  ndi0 - mean(ndi0)) %>%
+  mutate(hads0_tot_cnt = hads0_tot - mean(hads0_tot))
+
+
+str(df_prediction)
+
+```
+
+# Missing measurements
+
+We omit visit from the data when NDI and/or HADS is missing
+
+```{r}
+df_prediction %>%
+  filter_all(any_vars(is.na(.)))
+
+df_prediction_with_na <- df_prediction 
+
+df_prediction <- df_prediction %>%
+  drop_na(ndi1_2)
+
+```
+
+# Prediction Model: find best random effects
+
+Fit random intercept and model with random intercept + slope. Both fitted with REML
+
+```{r}
+
+# random intercept
+model_final <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct, method = "REML",
+                         random = ~1|id, data = df_prediction)
+
+
+
+
+```

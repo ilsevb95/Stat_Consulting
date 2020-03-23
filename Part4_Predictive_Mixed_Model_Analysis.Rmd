@@ -72,7 +72,7 @@ str(df_prediction)
 
 # Missing measurements
 
-We omit visit from the data when one least NDI or HADS is missing
+We omit visit from the data when NDI and/or HADS is missing
 
 ```{r}
 df_prediction %>%
