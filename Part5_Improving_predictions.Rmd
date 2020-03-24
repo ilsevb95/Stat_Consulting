@@ -1,7 +1,7 @@
 ---
-title: 'Part5: Improving predictions'
+title: 'Part5: data cleaning to improve predictions'
 author: "Ilse van Beelen"
-date: "1/20/2020"
+date: "2020/03/23"
 output: html_document
 ---
 
@@ -9,9 +9,10 @@ output: html_document
 ```{r setup, include=FALSE, echo=TRUE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = "hide")
 
+
 ```
 
-Goal: create a prediction model for the NDI at 104 weeks, based on NDI, HADS anx & depres at baseline and 52 weeks. 
+Goal of this file: merge mutiple datasets together. Next part will try to improve prediction model with the new variables.
 
 # Set up
 
@@ -20,41 +21,24 @@ Goal: create a prediction model for the NDI at 104 weeks, based on NDI, HADS anx
 # Load libraries
 rm(list = ls())
 set.seed(19950306)
-library(ggplot2)
-library(lme4)
+
 library(tidyverse)
-library(nlme)
-library(emmeans)
-library(car)
-library(lattice)
-library(merTools)
-library(xtable)
-library(caret)
-library(groupdata2)
-
-# Set layout for all figures
-theme <- theme(panel.background = element_blank(),
-          panel.grid.major = element_line(colour = "darkgrey", size=0.5),
-          panel.grid.minor = element_line(colour = "grey", 
-                                          size=.25, 
-                                          linetype = "dashed"),
-          panel.border = element_blank(),
-          axis.line.x = element_line(colour = "black", 
-                                     size=0.5, 
-                                     lineend = "butt"),
-          axis.line.y = element_line(colour = "black", 
-                                     size=0.5),
-          axis.text=element_text(size=15),
-              axis.title=element_text(size=22),
-              plot.title = element_text(size = 22),
-              strip.text = element_text(size = 15),
-              legend.title = element_blank())
+library(haven)
 
 
-
+# read in datasets
 df_prediction <- read.csv("Data/data_final_prediction_2019-11-05.csv", sep = ",")
+dat_raw <- read_sav("Data/Dataset NECK HADS stuk 16-05-2019.sav")
+dat_aa <- read_sav("Data/Dataset_AA.sav")
+dat_ba <- read_sav("Data/Dataset_BA.sav")
+dat_bc <- read_sav("Data/Dataset_BC.sav")
+dat_dh <- read_sav("Data/Dataset_Disc_Height.sav")
 
+```
 
+# Prep prediction data (same as older scripts)
+
+```{r}
 
 # Center predictors -> makes interpretation intercept easier
 # Create new numbering voor de IDs -> for Cross validation
@@ -64,37 +48,79 @@ df_prediction <- df_prediction %>%
   mutate(ndi0_cnt =  ndi0 - mean(ndi0)) %>%
   mutate(hads0_tot_cnt = hads0_tot - mean(hads0_tot))
 
-
-str(df_prediction)
-
-```
-
-# Missing measurements
-
-We omit visit from the data when NDI and/or HADS is missing
-
-```{r}
-df_prediction %>%
-  filter_all(any_vars(is.na(.)))
-
-df_prediction_with_na <- df_prediction 
-
+# remove missing data
+# We omit visit from the data when NDI and/or HADS is missing
 df_prediction <- df_prediction %>%
   drop_na(ndi1_2)
 
+
 ```
 
-# Prediction Model: find best random effects
 
-Fit random intercept and model with random intercept + slope. Both fitted with REML
+
+# Some extra data cleaning
+
+```{r}
+# dat_raw: age.ok, gender, smoking, alcohol, weight, length, bmi, duur_klachten
+dat1 <- dat_raw %>%
+  dplyr::select(PATIENTID, PMOMENTX, AGE.OK, GENDER, Smoking, Alcohol, WEIGHT, LENGTH, 
+                BMI, Duur_Klachten) %>%
+  dplyr::filter(PMOMENTX == 0) %>%
+  dplyr::select(-PMOMENTX)
+
+# dat_aa:
+dat2 <- dat_aa %>%
+  dplyr::select(ID, IDAA, VINT01A, VINT01W, VINT01J, NEKPIJN, OSTSPOND) 
+
+# dat_ba:
+dat3 <- dat_ba %>%
+  dplyr::select(ID, IDAA, NEKHFAM) %>%
+  drop_na(NEKHFAM)
+
+# dat_bc:
+dat4 <- dat_bc %>%
+  dplyr::select(ID, IDAA, PMOMENTX, VVAS01, VVAS02, VDLV15A2) %>%
+  dplyr::filter(PMOMENTX == -1) %>%
+  dplyr::select(-PMOMENTX)
+
+# dat_dh:
+# dh = disc height
+dat5 <- dat_dh %>%
+  dplyr::select(PATIENTID, DHindexlevelBaseline) %>%
+  mutate(PATIENTID = paste0("L", PATIENTID)) %>%
+  drop_na(DHindexlevelBaseline)
+
+
+# merge all datasets
+# two datasets below have a patientid column
+dat15 <- left_join(dat1, dat5, by = c( "PATIENTID"))
+
+# create patientid for datasets below 
+dat23 <- full_join(dat2, dat3, by = c("ID", "IDAA"))
+dat234 <- full_join(dat23, dat4, by = c("ID", "IDAA"))
+
+dat234 <- dat234 %>%
+  mutate(PATIENTID = paste0("L", ID, IDAA)) %>%
+  dplyr::select(-ID, -IDAA)
+
+
+
+dat_tot <- full_join(dat234, dat15, by = c( "PATIENTID"))
+dat_tot <- dat_tot %>% 
+  dplyr::select(PATIENTID, everything()) %>%
+  rename(id = PATIENTID)
+
+# laste merge
+df_all <- left_join(df_prediction, dat_tot, by = "id") # only wants id's who are in df_prediction
+df_all <- df_all %>% dplyr::select(id, id_revalue, everything())
+
+```
+
+# Save 
 
 ```{r}
 
-# random intercept
-model_final <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct, method = "REML",
-                         random = ~1|id, data = df_prediction)
-
-
-
+write.csv(df_all, "Data/df_prediction_new_2020-03-23.csv")
 
 ```
+
