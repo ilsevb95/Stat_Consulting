@@ -22,29 +22,31 @@ set.seed(19950306)
 library(lme4)
 library(tidyverse)
 library(leaps)
+library(glmnet)
+library(lmmlasso)
+library(lmmen)
 
 df_pred <- read.csv("Data/df_prediction_new_2020-03-23.csv")
+
 
 # VINT01A, VINT01J, VINT01W, OSTSPOND --> to many NAs
 # X, id_revalue, ndi0, hads0_tot, hads0_anx, hads0_depr --> not used
 df_pred <- df_pred %>%
-  dplyr::select(-c(X, id_revalue, ndi0, hads0_tot, hads0_anx, hads0_depr, VINT01A, VINT01J, VINT01W,
-                   OSTSPOND))
-
-# remove all missing values
-#df_pred2 <- df_pred%>% filter_all(any_vars(is.na(.)))
+  dplyr::select(-c(X, id, ndi0, hads0_tot, hads0_anx, hads0_depr, VINT01A, VINT01J, VINT01W,
+                   OSTSPOND)) %>%
+  mutate(ndi1_2 = as.numeric(ndi1_2)) %>%
+  na.omit(.) # remove NAs
 
 # create dataframe for LM (only for time = 52 weeks)
 df_pred_lm <- df_pred %>%
   dplyr::filter(time_fct == 52) %>%
-  dplyr::select(-c(id, time_fct)) %>% # dont need these variables
-  na.omit() 
+  dplyr::select(-c(time_fct, id_revalue)) %>% # dont need these variables
+  na.omit(.) 
+
 
 
 # create train (80%) and test (20%) data for best subset, ridge, lasso
-
 shuffle_ids <- sample(c(0,1), nrow(df_pred_lm), prob = c(0.5, 0.5), replace = T)
-
 df_train <- df_pred_lm %>% filter(shuffle_ids == 0) %>% na.omit()
 df_test <- df_pred_lm %>% filter(shuffle_ids == 1) %>% na.omit()
 
@@ -54,11 +56,11 @@ df_test <- df_pred_lm %>% filter(shuffle_ids == 1) %>% na.omit()
 
 # Missing values
 
+The predictors VINT01A, VINT01J, VINT01W, OSTSPOND contain very high amounts of NAs. Therefore, these were already removed. The remaining predictors contain betweeen 0-13 \% NAs.
+
 ```{r}
 
 na_count <- sapply(df_pred, function(y) sum(length(which(is.na(y)))))
-na_count
-
 round(na_count/nrow(df_pred), 2)
 
 ```
@@ -77,10 +79,6 @@ summary(mdl_full)
 # LM - Best subset
 
 ```{r}
-library(tidyr)
-# remove 3 subjects to make number even (90/5=18)
-#df_pred_lm <- df_pred_lm[-c(91:93),]
-
 
 K <- 5
 index <- rep(1:K, floor(nrow(df_pred_lm)/K)+1)[1:nrow(df_pred_lm)]
@@ -132,33 +130,11 @@ coef(best_fit, 1) #Best subset only has Intercept and ndi0_cnt
 ```
 
 
-```{r}
-
-# EXTRA CODE
-cv.errors <- matrix(NA, K, 16, dimnames=list(NULL, paste(1:16)))
-folds <- fold.index
-
-for(j in 1:K){
-  # Fit the model with each subset of predictors on the training part of the fold
-  best.fit=regsubsets(ndi1_2 ~.,data=df_pred_lm[folds!=j,], nvmax=15) 
-  # For each subset
-  for(i in 1:16){
-    # Predict on the hold out part of the fold for that subset
-    pred=prediction_subsets(best.fit, df_pred_lm[folds==j,],id=i)
-    # Get the mean squared error for the model trained on the fold with the subset
-    cv.errors[j,i]=mean((df_pred_lm$ndi1_2[folds==j]-pred)^2)
-  }
-}
-
-
-```
 
 
 # LM - Ridge
+
 ```{r}
-library(glmnet)
-
-
 x_train <- model.matrix(ndi1_2~.,data=df_train)[,-1]
 y_train <- df_train$ndi1_2
 x_test <- model.matrix(ndi1_2~.,data=df_test)[,-1]
@@ -210,7 +186,9 @@ lasso_MSE <- matrix(data=numeric(5*100),nrow=5,ncol=100)
 
 
 lasso.mod <- glmnet(x_train, y_train, alpha=1, lambda=grid, standardize=TRUE)
+plot(lasso.mod)
 cv.out.lasso<- cv.glmnet(x_train,y_train,alpha=1)
+plot(cv.out.lasso)
 bestlam.lasso <- cv.out.lasso$lambda.min
 
 
@@ -234,24 +212,95 @@ mean(mse_lasso_CV)#163.811
 coef(lasso.mod, s = bestlam.lasso)
 ```
 
-# LMM
+# LMM Lasso
 
 ```{r}
+df_pred$int <- 1
+xmat <- as.matrix(df_pred[, c(3:19)])
+xmat_int <- as.matrix(df_pred[, c(20, 3:19)])
+ymat <- as.matrix(df_pred[,2])
+ids <- as.matrix(df_pred[,1])
 
-model_final <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct + AGE.OK + 
-                           NEKPIJN + NEKHFAM + WEIGHT , method = "REML",
-                         random = ~1|id, data = df_pred2, na.action = na.omit)
+# test_matrix = y+X+Z
+Test_Matrix <- cbind(ymat, xmat, ids)
+colnames(Test_Matrix) <- c("y", sprintf("X%s",1:17), "Z")
+rownames(Test_Matrix) <- df_pred$id_revalue
 
-summary(model_final)
+# find optimal lambda
+grid <- seq(0,10,0.01)
+cv.lmmlasso <- lmmen::cv.lmmlasso(dat = Test_Matrix, lambda = grid)
+cv.lmmlasso
+
+plot(cv.lmmlasso$BIC_path)
+optimal_lambda <- grid[which.min(cv.lmmlasso$BIC_path)]
 
 
-model_full <- nlme::lme(ndi1_2 ~ ., method = "REML",
-                         random = ~1|id, data = df_pred2,  na.action = na.omit) # werkt niet
 
-summ ary(model_full)
+mld_lmm <- lmmlasso(x=xmat_int, y=ymat, z = ids, grp = ids, 
+                    weights = rep_len(1, 18), lambda = optimal_lambda, standardize = T)
+
+summary(mld_lmm)
+
+
+# cross validation
+library(groupdata2)
+df_pred2 <- df_pred %>% select(-c(id_revalue, int))
+
+K <- 5
+df_pred <- fold(df_pred, k = K, id_col = "id_revalue") %>%
+  print(n=Inf)
+
+
+
+
+mse_lasso_CV <- numeric(K)
+for(j in 1:K){
+  x_train <- model.matrix(ndi1_2~ .,
+                          data= df_pred2[df_pred$.folds == j,])
+  x_train <- x_train[,1]
+  y_train <- df_pred2[df_pred$fold.index != 1,]$ndi1_2
+  x_test <- model.matrix(ndi1_2~.,
+                         data=df_pred2[df_pred$.folds == j, ])[,-1]
+  y_test <- df_pred2[df_pred$.folds == j, ]$ndi1_2
+  lasso.mod <-  lmmlasso(x=xmat_int, y=ymat, z = ids, grp = ids, 
+                    weights = rep_len(1, 18), lambda = optimal_lambda, standardize = T)
+  pred.lasso <- predict(lasso.mod, s=optimal_lambda, newx=x_test)
+  mse_lasso_CV[j] <-mean((pred.lasso - y_test)^2)
+}
+mean(mse_lasso_CV)#163.811
+
+coef(lasso.mod, s = bestlam.lasso)
+
+
+
+
+# check diagnostics model
+plot(mld_lmm)
+
+
 
 ```
 
+
+
+```{r}
+
+ClientID              <- rep(1:6,each=5)
+Age                   <- rep(c(9,11,10,13,15,12),each=5)  
+Gender                <- rep(c(0,1),each=5,time=3)
+Medication            <- rep(c(1,1,0,0,0,1),each=5)
+Treatment             <- rep(c(0,1,1,1,0,0),each=5)
+Treatment_site        <- rep(c(1,3,2,2,1,3),each=5)
+Day                   <- c(0, 20, 40, 60, 80, 0, 25, 50, 75, 100, 0, 22, 40, 65, 80, 0, 33, 50, 79, 95, 0, 16, 41, 69, 88, 0, 30, 60, 90, 120)
+Symptoms              <- c(8, 7, 6, 5, 4, 14, 12, 11, 8, 6, 9, 7, 9, 7, 5, 6, 4, 5, 3, 3, 8, 6, 3, 3, 2, 11, 14, 13, 11, 10)
+Data                  <- as.matrix(cbind(Age, Gender, Medication, Treatment, Day))
+Test_Matrix           <- cbind(Symptoms, Data, Treatment_site)
+colnames(Test_Matrix) <- c("y", sprintf("X%s",1:5), "Z")
+rownames(Test_Matrix) <- ClientID
+cv_test <- lmmen::cv.lmmlasso(Test_Matrix)
+plot(cv_test$BIC_path)
+
+```
 
 
 
