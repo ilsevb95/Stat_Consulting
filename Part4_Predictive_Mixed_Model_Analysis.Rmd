@@ -100,7 +100,21 @@ model_final2 <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct, method =
                          random = ~1+time_fct|id, data = df_prediction)
 
 
+model_final3 <- lmer(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct + (1|id) + (0+time_fct|id), 
+                     data = df_prediction,REML = F)
+
+
 anova(model_final, model_final2)
+
+plot(ranef(model_final2, order=T))
+
+df_ranef <- as.data.frame(ranef(model_final2))
+plot(sort(df_ranef[,1], df_ranef[,2]))
+
+df_ranef <- df_ranef[order(df_ranef$`(Intercept)`),]
+
+plot(df_ranef$`(Intercept)`, df_ranef$time_fct104)
+
 
 
 ```
@@ -110,8 +124,8 @@ anova(model_final, model_final2)
 
 We fit the following prediction model, using REML.
 
-$$NDI_{i1,i2} = \beta_0 + \beta_1 HADS_{i0} + \beta_2 NDI_{i0} + \beta_3 Time_{i1, i2} + b_{i0} + \varepsilon_{i1, i2} \\
-i = 1,2,3, \ldots, 109$$
+$$ NDI_{i1,i2} = \beta_0 + \beta_1 HADS_{i0} + \beta_2 NDI_{i0} + \beta_3 Time_{i1, i2} + b_{i0} + \varepsilon_{i1, i2} \\
+i = 1,2,3, \ldots, 109 $$
 
 ```{r}
 

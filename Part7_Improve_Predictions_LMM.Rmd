@@ -1,0 +1,297 @@
+---
+title: 'Part7: Improve predictions LMM'
+author: "Ilse van Beelen"
+date: "4/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Set-up
+
+```{r}
+# Set-up
+rm(list = ls())
+set.seed(19950306)
+
+library(lme4)
+library(tidyverse)
+library(leaps)
+library(glmnet)
+library(lmmlasso)
+library(lmmen)
+library(MASS)
+library(groupdata2)
+
+df_pred <- read.csv("Data/df_prediction_new_2020-03-23.csv")
+
+# 10 obs are removed due to missingness
+df_pred <- df_pred %>%
+  dplyr::select(id, id_revalue, ndi1_2, time_fct, ndi0_cnt, hads0_tot_cnt, LENGTH) %>%
+  na.omit()
+
+```
+
+# LMM
+
+```{r}
+
+model_old <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct, 
+                         method = "ML",
+                         random = ~1|id, data = df_pred)
+
+
+model_new <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct + LENGTH, 
+                         method = "ML",
+                         random = ~1|id, data = df_pred)
+
+model_new2 <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + LENGTH, 
+                         method = "ML",
+                         random = ~1|id, data = df_pred)
+
+
+anova(model_old, model_new)
+anova(model_new, model_new2)
+
+summary(model_new2)
+
+
+
+
+```
+
+# LMM Cross validation
+
+```{r}
+
+# Add new column with folds numbers
+K <- 5
+df_pred <- fold(df_pred, k = K, id_col = "id_revalue") %>%
+  print(n=Inf)
+
+# Create Loss function: Root Mean Squard Error
+Loss <- function(x, y){
+  mse <- sum((x-y)^2)/length(x)
+  rmse <- sqrt(mse)
+  return(rmse)
+}
+
+
+loss <- numeric(K)
+loss2 <- numeric(K)
+list_pred <- c()
+list_pred2 <- c()
+
+for (k in 1:K){
+  training <- df_pred[df_pred$.folds !=k, ]
+  validation <- df_pred[df_pred$.folds ==k, ]
+  training.fit <-  lme4::lmer(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + LENGTH + time_fct + (1|id), 
+                    data = training, REML = T)
+  training.fit2 <-  lme4::lmer(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + LENGTH + (1|id), 
+                    data = training, REML = T)
+  
+  validation.predict <- predict(training.fit, newdata=validation, type='response',
+                                 allow.new.levels = T)
+  validation.predict2 <- predict(training.fit2, newdata=validation, type='response',
+                                 allow.new.levels = T)
+  loss[k] <- Loss(validation$ndi1_2, validation.predict)
+  loss2[k] <- Loss(validation$ndi1_2, validation.predict2)
+  
+  # Save predictions in list
+  list_pred[[k]] <- validation %>%
+    dplyr::select(id_revalue, id, ndi1_2, time_fct, .folds) %>%
+    mutate(pred = validation.predict)
+  
+  list_pred2[[k]] <- validation %>%
+    dplyr::select(id_revalue, id, ndi1_2, time_fct, .folds) %>%
+    mutate(pred = validation.predict2)
+}
+
+
+# Show RMSE + SD
+loss; loss2
+RMSE  <- round(mean(loss), digits = 3); RMSE2  <- round(mean(loss2), digits = 3)
+RMSE; RMSE2
+round(sd(loss), digits = 1)
+
+
+# 95 % CI of RMSE
+RMSE_se <- sd(loss) / sqrt(100) # 100 unique ids
+lower <- round(mean(loss) - 1.96 * RMSE_se, digits = 1)
+upper  <- round(mean(loss) + 1.96 * RMSE_se, digits = 1)
+c(lower, upper)
+
+```
+
+
+# LMM RMSE for 52 and 104 weeks -- time as predictor
+
+
+Calculate RMSE for 52 and 104 weeks seperate for model with NDI0, HADS0, time, length as predictors
+
+```{r}
+
+df_cv <- do.call("rbind", list_pred)
+
+df_cv52 <- df_cv %>%
+  filter(time_fct == 52)
+
+
+df_cv104 <- df_cv %>%
+  filter(time_fct == 104)
+
+# calculate rmse per time point
+df_cv52 <- df_cv52 %>%
+  group_by(.folds) %>%
+  mutate(loss = Loss(ndi1_2, pred))
+
+
+rmse_52 <- unique(df_cv52$loss)
+round(mean(rmse_52), 3)
+round(sd(rmse_52), 1)
+
+
+df_cv104 <- df_cv104 %>%
+  group_by(.folds) %>%
+  mutate(loss = Loss(ndi1_2, pred))
+
+rmse_104 <- unique(df_cv104$loss)
+round(mean(rmse_104), 3)
+round(sd(rmse_104), 1)
+
+```
+
+
+# LMM RMSE for 52 and 104 weeks -- time not as predictor
+
+
+Calculate RMSE for 52 and 104 weeks seperate for model with NDI0, HADS0, length as predictors
+
+```{r}
+
+df_cv <- do.call("rbind", list_pred2)
+
+df_cv52 <- df_cv %>%
+  filter(time_fct == 52)
+
+
+df_cv104 <- df_cv %>%
+  filter(time_fct == 104)
+
+# calculate rmse per time point
+df_cv52 <- df_cv52 %>%
+  group_by(.folds) %>%
+  mutate(loss = Loss(ndi1_2, pred))
+
+
+rmse_52_2 <- unique(df_cv52$loss)
+round(mean(rmse_52_2), 3)
+round(sd(rmse_52_2), 2)
+
+
+df_cv104 <- df_cv104 %>%
+  group_by(.folds) %>%
+  mutate(loss = Loss(ndi1_2, pred))
+
+rmse_104_2 <- unique(df_cv104$loss)
+round(mean(rmse_104_2), 3)
+round(sd(rmse_104_2), 2)
+
+```
+
+
+
+# LMM Lasso
+
+```{r}
+df_pred$int <- 1
+xmat <- as.matrix(df_pred[, c(3:19)])
+xmat_int <- as.matrix(df_pred[, c(20, 3:19)])
+ymat <- as.matrix(df_pred[,2])
+ids <- as.matrix(df_pred[,1])
+
+# test_matrix = y+X+Z
+Test_Matrix <- cbind(ymat, xmat, ids)
+colnames(Test_Matrix) <- c("y", sprintf("X%s",1:17), "Z")
+rownames(Test_Matrix) <- df_pred$id_revalue
+
+# find optimal lambda
+grid <- seq(0,10,0.01)
+cv.lmmlasso <- lmmen::cv.lmmlasso(dat = Test_Matrix, lambda = grid)
+cv.lmmlasso
+
+plot(cv.lmmlasso$BIC_path)
+optimal_lambda <- grid[which.min(cv.lmmlasso$BIC_path)]
+
+
+
+mld_lmm <- lmmlasso(x=xmat_int, y=ymat, z = ids, grp = ids, 
+                    weights = rep_len(1, 18), lambda = optimal_lambda, standardize = T)
+
+summary(mld_lmm)
+
+
+# cross validation
+library(groupdata2)
+df_pred2 <- df_pred %>% select(-c(id_revalue, int))
+
+K <- 5
+df_pred <- fold(df_pred, k = K, id_col = "id_revalue") %>%
+  print(n=Inf)
+
+
+
+
+mse_lasso_CV <- numeric(K)
+for(j in 1:K){
+  x_train <- model.matrix(ndi1_2~ .,
+                          data= df_pred2[df_pred$.folds == j,])
+  x_train <- x_train[,1]
+  y_train <- df_pred2[df_pred$fold.index != 1,]$ndi1_2
+  x_test <- model.matrix(ndi1_2~.,
+                         data=df_pred2[df_pred$.folds == j, ])[,-1]
+  y_test <- df_pred2[df_pred$.folds == j, ]$ndi1_2
+  lasso.mod <-  lmmlasso(x=xmat_int, y=ymat, z = ids, grp = ids, 
+                    weights = rep_len(1, 18), lambda = optimal_lambda, standardize = T)
+  pred.lasso <- predict(lasso.mod, s=optimal_lambda, newx=x_test)
+  mse_lasso_CV[j] <-mean((pred.lasso - y_test)^2)
+}
+mean(mse_lasso_CV)#163.811
+
+coef(lasso.mod, s = bestlam.lasso)
+
+
+
+
+# check diagnostics model
+plot(mld_lmm)
+
+
+
+```
+
+## LMM Lasso example
+
+```{r}
+
+ClientID              <- rep(1:6,each=5)
+Age                   <- rep(c(9,11,10,13,15,12),each=5)  
+Gender                <- rep(c(0,1),each=5,time=3)
+Medication            <- rep(c(1,1,0,0,0,1),each=5)
+Treatment             <- rep(c(0,1,1,1,0,0),each=5)
+Treatment_site        <- rep(c(1,3,2,2,1,3),each=5)
+Day                   <- c(0, 20, 40, 60, 80, 0, 25, 50, 75, 100, 0, 22, 40, 65, 80, 0, 33, 50, 79, 95, 0, 16, 41, 69, 88, 0, 30, 60, 90, 120)
+Symptoms              <- c(8, 7, 6, 5, 4, 14, 12, 11, 8, 6, 9, 7, 9, 7, 5, 6, 4, 5, 3, 3, 8, 6, 3, 3, 2, 11, 14, 13, 11, 10)
+Data                  <- as.matrix(cbind(Age, Gender, Medication, Treatment, Day))
+Test_Matrix           <- cbind(Symptoms, Data, Treatment_site)
+colnames(Test_Matrix) <- c("y", sprintf("X%s",1:5), "Z")
+rownames(Test_Matrix) <- ClientID
+cv_test <- lmmen::cv.lmmlasso(Test_Matrix)
+plot(cv_test$BIC_path)
+
+```
+
+
+
