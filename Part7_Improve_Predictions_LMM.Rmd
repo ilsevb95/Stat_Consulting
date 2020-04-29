@@ -39,15 +39,16 @@ df_pred <- df_pred %>%
 ```{r}
 
 model_old <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct, 
-                         method = "ML",
+                         method = "REML",
                          random = ~1|id, data = df_pred)
 
 
-model_new <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct + LENGTH, 
-                         method = "ML",
+df_pred$length_cnt <- df_pred$LENGTH - mean(df_pred$LENGTH)
+model_new <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct + length_cnt, 
+                         method = "REML",
                          random = ~1|id, data = df_pred)
 
-model_new2 <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + LENGTH, 
+model_new2 <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct, 
                          method = "ML",
                          random = ~1|id, data = df_pred)
 
@@ -55,8 +56,8 @@ model_new2 <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + LENGTH,
 anova(model_old, model_new)
 anova(model_new, model_new2)
 
-summary(model_new2)
-
+summary(model_old)
+summary(model_new)
 
 
 
@@ -89,7 +90,7 @@ for (k in 1:K){
   validation <- df_pred[df_pred$.folds ==k, ]
   training.fit <-  lme4::lmer(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + LENGTH + time_fct + (1|id), 
                     data = training, REML = T)
-  training.fit2 <-  lme4::lmer(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + LENGTH + (1|id), 
+  training.fit2 <-  lme4::lmer(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct + (1|id), 
                     data = training, REML = T)
   
   validation.predict <- predict(training.fit, newdata=validation, type='response',
@@ -167,7 +168,7 @@ round(sd(rmse_104), 1)
 # LMM RMSE for 52 and 104 weeks -- time not as predictor
 
 
-Calculate RMSE for 52 and 104 weeks seperate for model with NDI0, HADS0, length as predictors
+Calculate RMSE for 52 and 104 weeks seperate for model with NDI0, HADS0 as predictors
 
 ```{r}
 
