@@ -29,7 +29,7 @@ df_pred <- read.csv("Data/df_prediction_new_2020-03-23.csv")
 
 # 10 obs are removed due to missingness
 df_pred <- df_pred %>%
-  dplyr::select(id, id_revalue, ndi1_2, time_fct, ndi0_cnt, hads0_tot_cnt, LENGTH) %>%
+  dplyr::select(id, id_revalue, ndi1_2, time_fct, ndi0_cnt, hads0_tot_cnt, LENGTH, WEIGHT) %>%
   na.omit()
 
 ```
@@ -39,13 +39,13 @@ df_pred <- df_pred %>%
 ```{r}
 
 model_old <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct, 
-                         method = "REML",
+                         method = "ML",
                          random = ~1|id, data = df_pred)
 
 
 df_pred$length_cnt <- df_pred$LENGTH - mean(df_pred$LENGTH)
 model_new <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct + length_cnt, 
-                         method = "REML",
+                         method = "ML",
                          random = ~1|id, data = df_pred)
 
 model_new2 <- nlme::lme(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct, 
@@ -66,6 +66,8 @@ summary(model_new)
 # LMM Cross validation
 
 ```{r}
+
+df_pred$weight_cnt <- df_pred$WEIGHT - mean(df_pred$WEIGHT)
 
 # Add new column with folds numbers
 K <- 5
@@ -88,7 +90,7 @@ list_pred2 <- c()
 for (k in 1:K){
   training <- df_pred[df_pred$.folds !=k, ]
   validation <- df_pred[df_pred$.folds ==k, ]
-  training.fit <-  lme4::lmer(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + LENGTH + time_fct + (1|id), 
+  training.fit <-  lme4::lmer(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + weight_cnt + time_fct + (1|id), 
                     data = training, REML = T)
   training.fit2 <-  lme4::lmer(ndi1_2 ~ ndi0_cnt + hads0_tot_cnt + time_fct + (1|id), 
                     data = training, REML = T)
@@ -130,7 +132,7 @@ c(lower, upper)
 # LMM RMSE for 52 and 104 weeks -- time as predictor
 
 
-Calculate RMSE for 52 and 104 weeks seperate for model with NDI0, HADS0, time, length as predictors
+Calculate RMSE for 52 and 104 weeks seperate for model with NDI0, HADS0, time, length/weight as predictors
 
 ```{r}
 
